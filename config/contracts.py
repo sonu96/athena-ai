@@ -38,6 +38,15 @@ CONTRACTS = {
                     {"name": "amountB", "type": "uint256"},
                     {"name": "liquidity", "type": "uint256"}
                 ]
+            },
+            {
+                "name": "getAmountsOut",
+                "type": "function",
+                "inputs": [
+                    {"name": "amountIn", "type": "uint256"},
+                    {"name": "routes", "type": "tuple[]"}
+                ],
+                "outputs": [{"name": "amounts", "type": "uint256[]"}]
             }
         ]
     },
@@ -82,6 +91,50 @@ CONTRACTS = {
                     {"name": "tokens", "type": "address[][]"},
                     {"name": "tokenId", "type": "uint256"}
                 ]
+            }
+        ]
+    },
+    "pool": {
+        "abi": [
+            {
+                "name": "getReserves",
+                "type": "function",
+                "inputs": [],
+                "outputs": [
+                    {"name": "reserve0", "type": "uint256"},
+                    {"name": "reserve1", "type": "uint256"},
+                    {"name": "blockTimestampLast", "type": "uint32"}
+                ]
+            },
+            {
+                "name": "totalSupply",
+                "type": "function",
+                "inputs": [],
+                "outputs": [{"name": "", "type": "uint256"}]
+            },
+            {
+                "name": "token0",
+                "type": "function",
+                "inputs": [],
+                "outputs": [{"name": "", "type": "address"}]
+            },
+            {
+                "name": "token1",
+                "type": "function",
+                "inputs": [],
+                "outputs": [{"name": "", "type": "address"}]
+            },
+            {
+                "name": "stable",
+                "type": "function",
+                "inputs": [],
+                "outputs": [{"name": "", "type": "bool"}]
+            },
+            {
+                "name": "fees",
+                "type": "function",
+                "inputs": [],
+                "outputs": [{"name": "", "type": "address"}]
             }
         ]
     }
