@@ -47,7 +47,7 @@ class PoolScanner:
             return
             
         self.scanning = True
-        logger.info("= Starting Aerodrome pool scanning...")
+        logger.info("=== Starting Aerodrome pool scanning...")
         
         while self.scanning:
             try:

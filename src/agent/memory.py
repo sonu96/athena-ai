@@ -7,7 +7,7 @@ from datetime import datetime
 from typing import Dict, List, Optional, Any
 from enum import Enum
 
-from mem0 import Memory
+from mem0 import Memory, MemoryClient
 from pydantic import BaseModel, Field
 from config.settings import settings, MEMORY_CATEGORIES
 
@@ -47,20 +47,14 @@ class AthenaMemory:
     def __init__(self):
         """Initialize memory system."""
         # Initialize Mem0
-        config = {
-            "vector_store": {
-                "provider": "qdrant",
-                "config": {
-                    "host": "localhost",
-                    "port": 6333,
-                }
-            }
-        }
-        
+        # Initialize memory based on configuration
         if settings.mem0_api_key:
-            config["api_key"] = settings.mem0_api_key
-            
-        self.memory = Memory.from_config(config)
+            # Use Mem0 cloud with API key
+            self.memory = MemoryClient(api_key=settings.mem0_api_key)
+        else:
+            # Use simple in-memory storage for now
+            self.memory = None
+            self._local_memories = []
         self.user_id = "athena_agent"
         
         # Memory statistics
@@ -116,19 +110,29 @@ class AthenaMemory:
                 "content": f"[{memory_type.value}] {content}"
             }]
             
-            result = self.memory.add(
-                messages=messages,
-                user_id=self.user_id,
-                metadata={
-                    **entry.metadata,
-                    "type": memory_type.value,
-                    "category": category,
-                    "confidence": confidence,
-                    "timestamp": entry.timestamp.isoformat(),
-                }
-            )
-            
-            memory_id = result['id']
+            if self.memory:
+                result = self.memory.add(
+                    messages=messages,
+                    user_id=self.user_id,
+                    metadata={
+                        **entry.metadata,
+                        "type": memory_type.value,
+                        "category": category,
+                        "confidence": confidence,
+                        "timestamp": entry.timestamp.isoformat(),
+                    }
+                )
+                memory_id = result['id']
+            else:
+                # Use local storage
+                import uuid
+                memory_id = str(uuid.uuid4())
+                self._local_memories.append({
+                    "id": memory_id,
+                    "entry": entry,
+                    "messages": messages,
+                    "timestamp": datetime.utcnow()
+                })
             entry.id = memory_id
             
             # Update stats
@@ -173,12 +177,34 @@ class AthenaMemory:
                 filters["type"] = memory_type.value
                 
             # Search memories
-            results = self.memory.search(
-                query=query,
-                user_id=self.user_id,
-                limit=limit * 2,  # Get extra to filter by confidence
-                filters=filters
-            )
+            if self.memory:
+                results = self.memory.search(
+                    query=query,
+                    user_id=self.user_id,
+                    limit=limit * 2,  # Get extra to filter by confidence
+                    filters=filters
+                )
+            else:
+                # Simple search in local storage
+                results = []
+                for mem in self._local_memories:
+                    entry = mem["entry"]
+                    # Check filters
+                    if category and entry.category != category:
+                        continue
+                    if memory_type and entry.type != memory_type:
+                        continue
+                    # Simple text match
+                    if query.lower() in mem["messages"][0]["content"].lower():
+                        results.append({
+                            "id": mem["id"],
+                            "metadata": {
+                                "confidence": entry.confidence,
+                                "category": entry.category,
+                                "type": entry.type.value
+                            },
+                            "content": mem["messages"][0]["content"]
+                        })
             
             # Filter by confidence and limit
             filtered_results = []
@@ -358,7 +384,13 @@ class AthenaMemory:
     async def export_memories(self) -> Dict:
         """Export all memories for backup."""
         try:
-            all_memories = self.memory.get_all(user_id=self.user_id)
+            if self.memory:
+                all_memories = self.memory.get_all(user_id=self.user_id)
+            else:
+                all_memories = [{"id": m["id"], "content": m["messages"][0]["content"], 
+                                "metadata": {"type": m["entry"].type.value, 
+                                           "category": m["entry"].category}}
+                               for m in self._local_memories]
             return {
                 "memories": all_memories,
                 "stats": self.stats,

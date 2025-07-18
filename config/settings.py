@@ -16,33 +16,42 @@ class Settings(BaseSettings):
     firestore_database: str = Field(default="(default)", env="FIRESTORE_DATABASE")
     
     # CDP Configuration - will be loaded from Secret Manager
-    cdp_api_key: Optional[str] = Field(None, env="CDP_API_KEY")
-    cdp_api_secret: Optional[str] = Field(None, env="CDP_API_SECRET")
+    cdp_api_key: Optional[str] = Field(None, env="CDP_API_KEY_ID")
+    cdp_api_secret: Optional[str] = Field(None, env="CDP_API_KEY_SECRET")
+    cdp_wallet_secret: Optional[str] = Field(None, env="CDP_WALLET_SECRET")
     
     @validator("cdp_api_key", pre=False, always=True)
     def load_cdp_api_key(cls, v, values):
         if v:
             return v
         # Load from Secret Manager if not in env
-        if "gcp_project_id" in values:
+        try:
             from src.gcp.secret_manager import get_secret
-            return get_secret("cdp-api-key", "CDP_API_KEY")
-        return v
+            return get_secret("cdp-api-key", "CDP_API_KEY_ID")
+        except Exception as e:
+            # If we can't load from Secret Manager, validation will fail
+            raise ValueError(f"Could not load cdp_api_key from Secret Manager: {e}")
     
     @validator("cdp_api_secret", pre=False, always=True)
     def load_cdp_api_secret(cls, v, values):
         if v:
             return v
         # Load from Secret Manager if not in env
-        if "gcp_project_id" in values:
+        try:
             from src.gcp.secret_manager import get_secret
-            return get_secret("cdp-api-secret", "CDP_API_SECRET")
-        return v
+            return get_secret("cdp-api-secret", "CDP_API_KEY_SECRET")
+        except Exception as e:
+            # If we can't load from Secret Manager, validation will fail
+            raise ValueError(f"Could not load cdp_api_secret from Secret Manager: {e}")
     
     # Google AI Configuration
-    google_cloud_project: str = Field(..., env="GCP_PROJECT_ID")
     google_ai_model: str = Field(default="gemini-1.5-pro", env="GOOGLE_AI_MODEL")
     google_location: str = Field(default="us-central1", env="GOOGLE_LOCATION")
+    
+    @property
+    def google_cloud_project(self) -> str:
+        """Return GCP project ID for Google AI."""
+        return self.gcp_project_id
     
     # LangSmith Configuration - will be loaded from Secret Manager
     langsmith_api_key: Optional[str] = Field(None, env="LANGSMITH_API_KEY")
@@ -79,6 +88,19 @@ class Settings(BaseSettings):
                 return get_secret("mem0-api-key", "MEM0_API_KEY")
             except:
                 return None  # Mem0 can work without API key
+        return v
+    
+    @validator("cdp_wallet_secret", pre=False, always=True)
+    def load_cdp_wallet_secret(cls, v, values):
+        if v:
+            return v
+        # Load from Secret Manager if not in env
+        if "gcp_project_id" in values:
+            try:
+                from src.gcp.secret_manager import get_secret
+                return get_secret("cdp-wallet-secret", "CDP_WALLET_SECRET")
+            except:
+                return None  # Wallet secret is optional - will be generated if needed
         return v
     
     # Agent Configuration

@@ -5,6 +5,11 @@ import asyncio
 import logging
 import threading
 import uvicorn
+from dotenv import load_dotenv
+
+# Load environment variables first
+load_dotenv()
+
 from src.agent.core import AthenaAgent
 from src.agent.memory import AthenaMemory
 from src.cdp.base_client import BaseClient

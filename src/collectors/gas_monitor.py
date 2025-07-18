@@ -47,7 +47,7 @@ class GasMonitor:
             return
             
         self.monitoring = True
-        logger.info("ý Starting gas price monitoring...")
+        logger.info("Starting gas price monitoring...")
         
         while self.monitoring:
             try:
@@ -203,11 +203,11 @@ class GasMonitor:
         avg = self.stats["24h_average"]
         
         if current < avg * Decimal("0.8"):
-            return "=â Excellent time to execute - gas is 20% below average"
+            return "=ï¿½ Excellent time to execute - gas is 20% below average"
         elif current < avg:
-            return "=á Good time to execute - gas is below average"
+            return "=ï¿½ Good time to execute - gas is below average"
         elif current < avg * Decimal("1.2"):
-            return "=á Average gas prices - consider waiting if not urgent"
+            return "=ï¿½ Average gas prices - consider waiting if not urgent"
         else:
             return "=4 High gas prices - wait if possible"
             

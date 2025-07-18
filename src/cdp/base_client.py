@@ -6,8 +6,10 @@ import logging
 from typing import Dict, List, Optional, Tuple
 from decimal import Decimal
 
-from cdp import Wallet, WalletData, Cdp
-from cdp.wallet import Wallet as CdpWallet
+# Ensure we're using the correct CDP SDK version
+from .version_check import check_cdp_version
+
+from cdp import CdpClient
 from config.settings import settings
 from config.contracts import CONTRACTS, TOKENS, DEFAULT_SLIPPAGE
 
@@ -22,6 +24,7 @@ class BaseClient:
         self.cdp = None
         self.wallet = None
         self._initialized = False
+        self._wallet_secret = None
         
     async def initialize(self):
         """Initialize CDP SDK and wallet."""
@@ -29,22 +32,56 @@ class BaseClient:
             return
             
         try:
-            # Configure CDP
-            Cdp.configure(
-                api_key_name=settings.cdp_api_key,
-                api_key_private_key=settings.cdp_api_secret,
-            )
+            # Configure CDP from JSON file if available
+            import os
+            import json
+            import secrets
             
-            # Create or load wallet
-            if settings.agent_wallet_id:
-                # Load existing wallet
-                self.wallet = Wallet.fetch(settings.agent_wallet_id)
-                logger.info(f"Loaded existing wallet: {settings.agent_wallet_id}")
+            json_path = os.environ.get('CDP_API_KEY_JSON_PATH')
+            if json_path and os.path.exists(json_path):
+                with open(json_path, 'r') as f:
+                    cdp_data = json.load(f)
+                api_key_id = cdp_data.get('id', cdp_data.get('api_key_name'))
+                api_key_secret = cdp_data.get('privateKey', cdp_data.get('private_key'))
+                logger.info(f"Loaded CDP credentials from JSON file: {json_path}")
             else:
-                # Create new wallet
-                self.wallet = Wallet.create()
-                logger.info(f"Created new wallet: {self.wallet.id}")
-                # TODO: Save wallet ID to settings
+                # Fall back to settings
+                api_key_id = settings.cdp_api_key
+                api_key_secret = settings.cdp_api_secret
+            
+            # Get or generate wallet secret
+            self._wallet_secret = settings.cdp_wallet_secret or os.environ.get('CDP_WALLET_SECRET')
+            if not self._wallet_secret:
+                self._wallet_secret = secrets.token_hex(32)
+                logger.info("Generated new wallet secret")
+                logger.info(f"⚠️  Save this to .env: CDP_WALLET_SECRET={self._wallet_secret}")
+                # Also save to secret manager for persistence
+                try:
+                    from src.gcp.secret_manager import create_or_update_secret
+                    create_or_update_secret("cdp-wallet-secret", self._wallet_secret)
+                    logger.info("✅ Saved wallet secret to Secret Manager")
+                except Exception as e:
+                    logger.warning(f"Could not save wallet secret to Secret Manager: {e}")
+            
+            # Create CDP client
+            self.cdp = CdpClient(
+                api_key_id=api_key_id,
+                api_key_secret=api_key_secret,
+                wallet_secret=self._wallet_secret
+            )
+            logger.info("CDP client created successfully")
+            
+            # Create or load account
+            if settings.agent_wallet_id and settings.agent_wallet_id.strip():
+                # Load existing account
+                self.wallet = await self.cdp.evm.get_account(settings.agent_wallet_id)
+                logger.info(f"Loaded existing account: {settings.agent_wallet_id}")
+            else:
+                # Create new account on Base chain
+                self.wallet = await self.cdp.evm.create_account()
+                logger.info(f"Created new account: {self.wallet.id}")
+                logger.info(f"Address: {self.wallet.address}")
+                logger.info(f"⚠️  Save this to .env: AGENT_WALLET_ID={self.wallet.id}")
                 
             self._initialized = True
             logger.info("CDP client initialized successfully")
@@ -52,23 +89,33 @@ class BaseClient:
         except Exception as e:
             logger.error(f"Failed to initialize CDP client: {e}")
             raise
+        finally:
+            # Close client if initialization fails
+            if hasattr(self, 'cdp') and not self._initialized:
+                await self.cdp.close()
             
     @property
     def address(self) -> str:
         """Get wallet address."""
         if not self.wallet:
             raise ValueError("Wallet not initialized")
-        return self.wallet.default_address.address_id
+        return self.wallet.address
         
     async def get_balance(self, token: str = "ETH") -> Decimal:
         """Get token balance."""
         try:
-            if token == "ETH":
-                balance = self.wallet.balance("eth")
-            else:
-                # Get ERC20 balance
-                balance = self.wallet.balance(TOKENS.get(token, token))
-            return Decimal(str(balance))
+            # Get token balances for the account
+            balances = await self.cdp.evm.list_token_balances(self.wallet.id)
+            
+            # Find the requested token
+            if hasattr(balances, 'data'):
+                for balance in balances.data:
+                    if token == "ETH" and balance.symbol == "ETH":
+                        return Decimal(balance.amount)
+                    elif balance.symbol == token:
+                        return Decimal(balance.amount)
+                    
+            return Decimal("0")
         except Exception as e:
             logger.error(f"Failed to get balance for {token}: {e}")
             return Decimal("0")

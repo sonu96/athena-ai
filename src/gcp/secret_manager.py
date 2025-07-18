@@ -146,6 +146,21 @@ class SecretManagerClient:
         except Exception as e:
             logger.error(f"Error updating secret {secret_id}: {e}")
             raise
+            
+    def create_or_update_secret(self, secret_id: str, secret_value: str) -> None:
+        """
+        Create a secret if it doesn't exist, or update it if it does.
+        
+        Args:
+            secret_id: The ID of the secret
+            secret_value: The secret value to store
+        """
+        try:
+            # Try to update first (secret exists)
+            self.update_secret(secret_id, secret_value)
+        except exceptions.NotFound:
+            # Secret doesn't exist, create it
+            self.create_secret(secret_id, secret_value)
 
 
 # Global instance
@@ -177,3 +192,15 @@ def get_secret(secret_id: str, env_var: Optional[str] = None) -> str:
         return manager.get_secret_or_env(secret_id, env_var)
     else:
         return manager.get_secret(secret_id)
+
+
+def create_or_update_secret(secret_id: str, secret_value: str) -> None:
+    """
+    Convenience function to create or update a secret.
+    
+    Args:
+        secret_id: The secret ID in Secret Manager
+        secret_value: The secret value to store
+    """
+    manager = get_secret_manager()
+    manager.create_or_update_secret(secret_id, secret_value)

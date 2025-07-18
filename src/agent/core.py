@@ -10,7 +10,7 @@ from decimal import Decimal
 from langchain_core.messages import BaseMessage, HumanMessage, AIMessage
 from langchain_google_vertexai import ChatVertexAI
 from langgraph.graph import StateGraph, END
-from langgraph.prebuilt import ToolExecutor
+# from langgraph.prebuilt import ToolExecutor  # Not used in current implementation
 
 from src.agent.memory import AthenaMemory, MemoryType
 from src.cdp.base_client import BaseClient
@@ -109,7 +109,7 @@ class AthenaAgent:
         
     async def observe(self, state: AgentState) -> Dict:
         """Observe current market conditions."""
-        logger.info("= Observing market conditions...")
+        logger.info("=== Observing market conditions...")
         
         observations = []
         
