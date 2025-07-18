@@ -45,7 +45,7 @@ class Settings(BaseSettings):
             raise ValueError(f"Could not load cdp_api_secret from Secret Manager: {e}")
     
     # Google AI Configuration
-    google_ai_model: str = Field(default="gemini-1.5-pro", env="GOOGLE_AI_MODEL")
+    google_ai_model: str = Field(default="gemini-1.5-flash", env="GOOGLE_AI_MODEL")
     google_location: str = Field(default="us-central1", env="GOOGLE_LOCATION")
     
     @property

@@ -29,7 +29,7 @@ User Query → LangGraph Agent → Memory (Mem0) → Decision
 
 - **AI/ML**: LangGraph, LangChain, Google Gemini
 - **Memory**: Mem0 + Google Firestore
-- **Blockchain**: CDP SDK for Base chain
+- **Blockchain**: CDP SDK v1.23.0 (Ed25519) for Base chain
 - **API**: FastAPI + WebSockets
 - **Observability**: LangSmith
 - **Infrastructure**: Google Cloud (Run, Firestore, Pub/Sub, Secret Manager)

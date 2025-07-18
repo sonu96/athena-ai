@@ -79,9 +79,11 @@ class BaseClient:
             else:
                 # Create new account on Base chain
                 self.wallet = await self.cdp.evm.create_account()
-                logger.info(f"Created new account: {self.wallet.id}")
-                logger.info(f"Address: {self.wallet.address}")
-                logger.info(f"⚠️  Save this to .env: AGENT_WALLET_ID={self.wallet.id}")
+                # Get the wallet address - for CDP SDK v1.23.0, the wallet ID is the address
+                wallet_address = self.wallet.addresses[0].address if hasattr(self.wallet, 'addresses') else str(self.wallet.address)
+                logger.info(f"Created new wallet")
+                logger.info(f"Address: {wallet_address}")
+                logger.info(f"⚠️  Save this to .env: AGENT_WALLET_ID={wallet_address}")
                 
             self._initialized = True
             logger.info("CDP client initialized successfully")
@@ -99,22 +101,25 @@ class BaseClient:
         """Get wallet address."""
         if not self.wallet:
             raise ValueError("Wallet not initialized")
-        return self.wallet.address
+        # Handle different SDK versions
+        if hasattr(self.wallet, 'addresses') and self.wallet.addresses:
+            return self.wallet.addresses[0].address
+        elif hasattr(self.wallet, 'address'):
+            return self.wallet.address
+        else:
+            raise ValueError("Unable to get wallet address")
         
     async def get_balance(self, token: str = "ETH") -> Decimal:
         """Get token balance."""
         try:
-            # Get token balances for the account
-            balances = await self.cdp.evm.list_token_balances(self.wallet.id)
+            # For CDP SDK v1.23.0, use the wallet's balances method
+            if hasattr(self.wallet, 'balances'):
+                balances = await self.wallet.balances()
+                # balances is a dict like {"ETH": balance_value}
+                if token in balances:
+                    return Decimal(str(balances[token]))
             
-            # Find the requested token
-            if hasattr(balances, 'data'):
-                for balance in balances.data:
-                    if token == "ETH" and balance.symbol == "ETH":
-                        return Decimal(balance.amount)
-                    elif balance.symbol == token:
-                        return Decimal(balance.amount)
-                    
+            # Fallback to 0 if not found
             return Decimal("0")
         except Exception as e:
             logger.error(f"Failed to get balance for {token}: {e}")

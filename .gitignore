@@ -74,3 +74,14 @@ application_default_credentials.json
 athena-wallet-*.json
 positions.json
 memories/
+
+# CDP related
+cdp_api_key*.json
+cdp_key.pem
+wallet_data.json
+
+# Test files (in case any remain)
+test_*.py
+check_*.py
+verify_*.py
+fix_*.py

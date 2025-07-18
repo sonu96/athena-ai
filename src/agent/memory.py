@@ -4,6 +4,7 @@ Athena's Memory System using Mem0
 import json
 import logging
 from datetime import datetime
+from decimal import Decimal
 from typing import Dict, List, Optional, Any
 from enum import Enum
 
@@ -111,18 +112,30 @@ class AthenaMemory:
             }]
             
             if self.memory:
+                # Ensure all metadata values are JSON serializable
+                safe_metadata = {}
+                for k, v in entry.metadata.items():
+                    if isinstance(v, datetime):
+                        safe_metadata[k] = v.isoformat()
+                    elif isinstance(v, Decimal):
+                        safe_metadata[k] = str(v)
+                    elif hasattr(v, '__dict__'):
+                        safe_metadata[k] = str(v)
+                    else:
+                        safe_metadata[k] = v
+                
                 result = self.memory.add(
                     messages=messages,
                     user_id=self.user_id,
                     metadata={
-                        **entry.metadata,
+                        **safe_metadata,
                         "type": memory_type.value,
                         "category": category,
                         "confidence": confidence,
                         "timestamp": entry.timestamp.isoformat(),
                     }
                 )
-                memory_id = result['id']
+                memory_id = result.get('id', result.get('results', [{}])[0].get('id', ''))
             else:
                 # Use local storage
                 import uuid
