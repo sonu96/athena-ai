@@ -1,0 +1,117 @@
+"""
+Aerodrome Protocol Contract Addresses and ABIs
+"""
+
+# Base Mainnet Addresses
+CONTRACTS = {
+    "router": {
+        "address": "0xcF77a3Ba9A5CA399B7c97c74d54e5b1Beb874E43",
+        "abi": [
+            {
+                "name": "swapExactTokensForTokens",
+                "type": "function",
+                "inputs": [
+                    {"name": "amountIn", "type": "uint256"},
+                    {"name": "amountOutMin", "type": "uint256"},
+                    {"name": "routes", "type": "tuple[]"},
+                    {"name": "to", "type": "address"},
+                    {"name": "deadline", "type": "uint256"}
+                ],
+                "outputs": [{"name": "amounts", "type": "uint256[]"}]
+            },
+            {
+                "name": "addLiquidity",
+                "type": "function",
+                "inputs": [
+                    {"name": "tokenA", "type": "address"},
+                    {"name": "tokenB", "type": "address"},
+                    {"name": "stable", "type": "bool"},
+                    {"name": "amountADesired", "type": "uint256"},
+                    {"name": "amountBDesired", "type": "uint256"},
+                    {"name": "amountAMin", "type": "uint256"},
+                    {"name": "amountBMin", "type": "uint256"},
+                    {"name": "to", "type": "address"},
+                    {"name": "deadline", "type": "uint256"}
+                ],
+                "outputs": [
+                    {"name": "amountA", "type": "uint256"},
+                    {"name": "amountB", "type": "uint256"},
+                    {"name": "liquidity", "type": "uint256"}
+                ]
+            }
+        ]
+    },
+    "factory": {
+        "address": "0x420DD381b31aEf6683db6B902084cB0FFECe40Da",
+        "abi": [
+            {
+                "name": "getPair",
+                "type": "function",
+                "inputs": [
+                    {"name": "tokenA", "type": "address"},
+                    {"name": "tokenB", "type": "address"},
+                    {"name": "stable", "type": "bool"}
+                ],
+                "outputs": [{"name": "pair", "type": "address"}]
+            },
+            {
+                "name": "allPairsLength",
+                "type": "function",
+                "inputs": [],
+                "outputs": [{"name": "", "type": "uint256"}]
+            }
+        ]
+    },
+    "voter": {
+        "address": "0x16613524e02ad97eDfeF371bC883F2F5d6C480A5",
+        "abi": [
+            {
+                "name": "vote",
+                "type": "function",
+                "inputs": [
+                    {"name": "tokenId", "type": "uint256"},
+                    {"name": "pools", "type": "address[]"},
+                    {"name": "weights", "type": "uint256[]"}
+                ]
+            },
+            {
+                "name": "claimBribes",
+                "type": "function",
+                "inputs": [
+                    {"name": "bribes", "type": "address[]"},
+                    {"name": "tokens", "type": "address[][]"},
+                    {"name": "tokenId", "type": "uint256"}
+                ]
+            }
+        ]
+    }
+}
+
+# Common Token Addresses on Base
+TOKENS = {
+    "WETH": "0x4200000000000000000000000000000000000006",
+    "USDC": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+    "DAI": "0x50c5725949A6F0c72E6C4a641F24049A917DB0Cb",
+    "AERO": "0x940181a94A35A4569E4529A3CDfB74e38FD98631",
+    "USDbC": "0xd9aAEc86B65D86f6A7B5B1b0c42FFA531710b6CA",
+}
+
+# Pool Types
+POOL_TYPES = {
+    "STABLE": True,  # For stablecoin pairs
+    "VOLATILE": False,  # For volatile pairs
+}
+
+# Fee Tiers (in basis points)
+FEE_TIERS = {
+    "STABLE": 1,  # 0.01%
+    "VOLATILE": 30,  # 0.3%
+}
+
+# Slippage Settings
+DEFAULT_SLIPPAGE = 0.005  # 0.5%
+MAX_SLIPPAGE = 0.03  # 3%
+
+# Gas Settings
+GAS_BUFFER = 1.2  # 20% buffer on gas estimates
+MAX_GAS_PRICE = 100  # Max 100 gwei

@@ -1,0 +1,76 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+ENV/
+env/
+.venv
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Test coverage
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+*.cover
+.pytest_cache/
+
+# MyPy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Build
+build/
+dist/
+*.egg-info/
+
+# Data
+data/
+*.db
+*.sqlite
+
+# Credentials (extra safety)
+*credentials*
+*secret*
+*.key
+*.pem
+
+# Temporary files
+tmp/
+temp/
+.temp/
+
+# Google Cloud
+.gcloud/
+application_default_credentials.json
+
+# Docker
+.dockerignore
+
+# Project specific
+athena-wallet-*.json
+positions.json
+memories/
