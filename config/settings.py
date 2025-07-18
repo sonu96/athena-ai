@@ -47,6 +47,22 @@ class Settings(BaseSettings):
     # Google AI Configuration
     google_ai_model: str = Field(default="gemini-1.5-flash", env="GOOGLE_AI_MODEL")
     google_location: str = Field(default="us-central1", env="GOOGLE_LOCATION")
+    google_api_key: Optional[str] = Field(None, env="GOOGLE_API_KEY")
+    
+    @validator("google_api_key", pre=False, always=True)
+    def load_google_api_key(cls, v, values):
+        """Load Google API key from Secret Manager if not in environment."""
+        if v is not None:
+            return v
+        if os.getenv("GOOGLE_API_KEY"):
+            return os.getenv("GOOGLE_API_KEY")
+        # Try to get from Secret Manager
+        try:
+            from src.gcp.secret_manager import get_secret
+            return get_secret("google-api-key", "GOOGLE_API_KEY")
+        except Exception:
+            # Google API key is optional for now
+            return None
     
     @property
     def google_cloud_project(self) -> str:

@@ -1,0 +1,21 @@
+# Core dependencies only
+cdp-sdk
+aiohttp
+fastapi
+uvicorn[standard]
+python-dotenv
+pydantic-settings
+
+# Google Cloud
+google-cloud-firestore
+google-cloud-secret-manager
+
+# Minimal AI dependencies
+langchain
+langgraph
+langchain-community
+langsmith
+
+# Essential utilities
+pandas
+numpy

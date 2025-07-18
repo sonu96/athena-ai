@@ -7,10 +7,8 @@ from typing import Dict, List, TypedDict, Annotated, Sequence
 from datetime import datetime
 from decimal import Decimal
 
-from langchain_core.messages import BaseMessage, HumanMessage, AIMessage
-from langchain_google_vertexai import ChatVertexAI
 from langgraph.graph import StateGraph, END
-# from langgraph.prebuilt import ToolExecutor  # Not used in current implementation
+import google.generativeai as genai
 
 from src.agent.memory import AthenaMemory, MemoryType
 from src.cdp.base_client import BaseClient
@@ -28,7 +26,7 @@ class AgentState(TypedDict):
     memories: List[Dict]
     decisions: List[Dict]
     next_action: str
-    messages: Annotated[Sequence[BaseMessage], "The messages in the conversation"]
+    messages: Annotated[Sequence[Dict], "The messages in the conversation"]
 
 
 class AthenaAgent:
@@ -42,13 +40,19 @@ class AthenaAgent:
         """Initialize Athena's consciousness."""
         self.memory = memory
         self.base_client = base_client
-        self.llm = ChatVertexAI(
-            model_name=settings.google_ai_model,
-            project=settings.google_cloud_project,
-            location=settings.google_location,
-            temperature=0.7,
-            max_output_tokens=2048,
-        )
+        # Initialize Gemini directly without LangChain
+        if settings.google_api_key:
+            genai.configure(api_key=settings.google_api_key)
+            self.model = genai.GenerativeModel(
+                model_name="gemini-pro",
+                generation_config={
+                    "temperature": 0.7,
+                    "max_output_tokens": 2048,
+                }
+            )
+        else:
+            logger.warning("Google API key not found - LLM features disabled")
+            self.model = None
         
         # Emotional state
         self.emotions = {
@@ -237,8 +241,11 @@ class AthenaAgent:
         3. Recommended strategies
         """
         
-        response = await self.llm.ainvoke([HumanMessage(content=prompt)])
-        analysis = response.content
+        if self.model:
+            response = await self.model.generate_content_async(prompt)
+            analysis = response.text
+        else:
+            analysis = "LLM analysis disabled - no API key configured"
         
         state["current_analysis"] = analysis
         return state
@@ -262,8 +269,11 @@ class AthenaAgent:
         Be specific and actionable.
         """
         
-        response = await self.llm.ainvoke([HumanMessage(content=prompt)])
-        theories = response.content.split('\n')
+        if self.model:
+            response = await self.model.generate_content_async(prompt)
+            theories = response.text.split('\n')
+        else:
+            theories = ["LLM theorizing disabled - no API key configured"]
         theories = [t.strip() for t in theories if t.strip()]
         
         state["theories"] = theories
@@ -396,8 +406,11 @@ class AthenaAgent:
         Keep it brief (2-3 sentences).
         """
         
-        response = await self.llm.ainvoke([HumanMessage(content=prompt)])
-        reflection = response.content
+        if self.model:
+            response = await self.model.generate_content_async(prompt)
+            reflection = response.text
+        else:
+            reflection = "LLM reflection disabled - no API key configured"
         
         # Store reflection
         await self.memory.remember(

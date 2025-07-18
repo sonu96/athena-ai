@@ -284,19 +284,23 @@ class BaseClient:
             if not pool_address:
                 return {}
                 
-            # Get pool reserves
-            reserves_result = self.wallet.read_contract(
+            # The CDP SDK v1.23.0 uses smart contracts via the wallet
+            # For read operations, we need to use a different approach
+            # Let's try using the CDP client directly
+            from cdp import SmartContract
+            
+            # Create contract instances
+            pool_contract = SmartContract(
+                network_id="base-mainnet",
                 contract_address=pool_address,
-                method="getReserves",
-                args={}
+                abi=CONTRACTS["pool"]["abi"]
             )
             
-            # Get total supply of LP tokens
-            total_supply_result = self.wallet.read_contract(
-                contract_address=pool_address,
-                method="totalSupply",
-                args={}
-            )
+            # Read reserves
+            reserves_result = pool_contract.read("getReserves", {})
+            
+            # Read total supply
+            total_supply_result = pool_contract.read("totalSupply", {})
             
             # Parse results
             reserve0 = Decimal(str(reserves_result[0])) / Decimal(10**18)
@@ -343,15 +347,19 @@ class BaseClient:
                 "stable": stable,
             }]
             
-            # Call getAmountsOut on router
-            amounts_result = self.wallet.read_contract(
+            # Use SmartContract for read operations
+            from cdp import SmartContract
+            
+            router_contract = SmartContract(
+                network_id="base-mainnet",
                 contract_address=CONTRACTS["router"]["address"],
-                method="getAmountsOut",
-                args={
-                    "amountIn": str(int(amount_in * 10**18)),
-                    "routes": route
-                }
+                abi=CONTRACTS["router"]["abi"]
             )
+            
+            amounts_result = router_contract.read("getAmountsOut", {
+                "amountIn": str(int(amount_in * 10**18)),
+                "routes": route
+            })
             
             # The result is an array where the last element is the output amount
             if amounts_result and len(amounts_result) > 1:
@@ -374,15 +382,20 @@ class BaseClient:
     ) -> Optional[str]:
         """Get pool address from factory."""
         try:
-            result = self.wallet.read_contract(
+            # Use SmartContract for read operations
+            from cdp import SmartContract
+            
+            factory_contract = SmartContract(
+                network_id="base-mainnet",
                 contract_address=CONTRACTS["factory"]["address"],
-                method="getPair",
-                args={
-                    "tokenA": token_a,
-                    "tokenB": token_b,
-                    "stable": stable,
-                }
+                abi=CONTRACTS["factory"]["abi"]
             )
+            
+            result = factory_contract.read("getPair", {
+                "tokenA": token_a,
+                "tokenB": token_b,
+                "stable": stable,
+            })
             return result if result != "0x0000000000000000000000000000000000000000" else None
         except Exception as e:
             logger.error(f"Failed to get pool address: {e}")

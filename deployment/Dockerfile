@@ -3,12 +3,17 @@ FROM python:3.11-slim
 # Set working directory
 WORKDIR /app
 
-# Install system dependencies
+# Install system dependencies including Rust for CDP SDK
 RUN apt-get update && apt-get install -y \
     gcc \
     g++ \
     git \
-    && rm -rf /var/lib/apt/lists/*
+    curl \
+    && rm -rf /var/lib/apt/lists/* \
+    && curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+
+# Add Rust to PATH
+ENV PATH="/root/.cargo/bin:${PATH}"
 
 # Copy requirements first for better caching
 COPY requirements.txt .
