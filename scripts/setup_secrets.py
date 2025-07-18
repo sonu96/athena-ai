@@ -49,6 +49,12 @@ def main():
             "description": "Your CDP API secret from Coinbase Developer Platform"
         },
         {
+            "id": "cdp-client-api-key",
+            "name": "CDP Client API Key",
+            "required": False,
+            "description": "CDP Client API Key for authenticated RPC access (real-time data)"
+        },
+        {
             "id": "langsmith-api-key",
             "name": "LangSmith API Key",
             "required": False,

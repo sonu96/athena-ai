@@ -1,0 +1,226 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Project Overview
+
+Athena is a 24/7 autonomous DeFi agent for Aerodrome on Base blockchain. It uses LangGraph for AI orchestration, Google Cloud Platform for infrastructure, and Coinbase CDP for blockchain interactions.
+
+## Common Development Commands
+
+### Local Development
+```bash
+# Install dependencies
+pip install -r requirements.txt
+
+# Run the application
+python run.py
+
+# Run with Docker Compose (includes Redis & Qdrant)
+docker-compose up
+```
+
+### Testing
+```bash
+# Run tests
+pytest
+
+# Run async tests
+pytest --asyncio-mode=auto
+```
+
+### Code Quality
+```bash
+# Format code
+black .
+
+# Lint
+flake8 .
+
+# Type check
+mypy .
+
+# Run pre-commit hooks
+pre-commit run --all-files
+```
+
+### Deployment
+```bash
+# Deploy to Cloud Run
+gcloud run deploy athena-ai --source . --region us-central1
+
+# Deploy via Cloud Build
+gcloud builds submit --config deployment/cloudbuild.yaml
+
+# View logs
+gcloud logging read "resource.type=cloud_run_revision AND resource.labels.service_name=athena-ai" --limit 50
+```
+
+## High-Level Architecture
+
+### Core Components
+
+1. **Agent System** (`src/agent/`)
+   - `core.py`: LangGraph state machine implementation
+   - States: OBSERVE → ANALYZE → DECIDE → EXECUTE → LEARN
+   - Uses Google Gemini for reasoning
+   - Emotional modeling for decision confidence
+
+2. **Memory Architecture** (`src/agent/memory.py`)
+   - Hierarchical: Short-term (Redis), Long-term (Firestore), Semantic (Vector DB)
+   - Categories: observations, pool_analysis, gas_patterns, strategies, decisions, emotions
+   - Pattern recognition and learning capabilities
+
+3. **CDP Integration** (`src/cdp/`)
+   - Secure wallet management without storing private keys
+   - Transaction simulation before execution
+   - Native Aerodrome protocol operations
+
+4. **Data Collection Pipeline** (`src/collectors/`)
+   - `pool_scanner.py`: Monitors Aerodrome pools
+   - `gas_monitor.py`: Tracks gas prices
+   - Event-driven via Google Pub/Sub
+
+5. **API Layer** (`src/api/`)
+   - FastAPI with WebSocket support
+   - Real-time updates and monitoring
+   - Endpoints: `/health`, `/performance/24h`, `/positions`, `/gas/recommendation`
+
+### Configuration Management
+
+- **Settings**: `config/settings.py` - Pydantic models with GCP Secret Manager integration
+- **Contracts**: `config/contracts.py` - Smart contract addresses
+- **Environment**: `.env` file for local development (GCP_PROJECT_ID required)
+
+### Security Architecture
+
+- All secrets stored in Google Secret Manager
+- CDP private keys never stored locally
+- Transaction simulation before execution
+- Risk limits and emergency controls
+
+### Deployment Architecture
+
+- **Cloud Run**: Always-on service with health checks
+- **Firestore**: State and memory persistence
+- **Pub/Sub**: Event-driven communication
+- **Secret Manager**: Secure credential storage
+
+## Key Development Patterns
+
+### Working with the Agent
+- Agent decisions flow through the LangGraph state machine
+- Each state has specific responsibilities and outputs
+- Emotional states influence decision confidence
+- Memory retrieval informs analysis
+
+### Adding New Strategies
+1. Update `config/settings.py` with strategy parameters
+2. Implement strategy logic in agent states
+3. Add memory categories if needed
+4. Update decision logic in `src/agent/core.py`
+
+### Blockchain Interactions
+- Use CDP client for all blockchain operations
+- Always simulate transactions first
+- Check gas prices before execution
+- Handle failures gracefully with retry logic
+
+### CDP Client API Usage
+
+#### Initialization
+```python
+from src.cdp.base_client import BaseClient
+
+# Initialize with automatic credential loading
+base_client = BaseClient()
+base_client.initialize()  # Loads from JSON file or environment
+
+# Access wallet address
+wallet_address = base_client.wallet.default_address.address_id
+```
+
+#### Common Operations
+```python
+# Get token balance
+balance = base_client.get_balance("USDC")
+
+# Swap tokens
+tx_hash = base_client.swap_tokens(
+    token_in="USDC",
+    token_out="WETH",
+    amount_in=100,  # Automatically handles decimals
+    min_amount_out=0.05,
+    recipient=wallet_address
+)
+
+# Add liquidity to pool
+tx_hash = base_client.add_liquidity(
+    token0="USDC",
+    token1="WETH",
+    amount0=1000,
+    amount1=0.5,
+    pool_address="0x...",
+    recipient=wallet_address
+)
+
+# Get pool information
+pool_info = base_client.get_pool_info("0x...")
+```
+
+#### CDP Configuration
+- Credentials: Store in `cdp_credentials.json` or set CDP_API_KEY_NAME/PRIVATE_KEY
+- Wallet persistence: Wallet ID saved in `wallet_id.txt`
+- Secret rotation: Use `scripts/update_cdp_config.py` for updates
+- Version requirement: CDP SDK v1.23.0+ (checked automatically)
+
+#### Real Data Access Setup
+For authenticated RPC access to real blockchain data:
+
+1. **Obtain CDP Client API Key** from Coinbase Developer Platform
+2. **Add to Google Secret Manager**:
+   ```bash
+   echo -n "your_client_api_key" | gcloud secrets create cdp-client-api-key --data-file=-
+   ```
+3. **Or set environment variable**:
+   ```bash
+   export CDP_CLIENT_API_KEY=your_client_api_key
+   ```
+
+Without CDP Client API Key, the system falls back to public RPC (rate limited).
+
+#### CDP Credentials Overview
+- **CDP API Key/Secret**: For wallet operations and transactions
+- **CDP Client API Key**: For authenticated RPC endpoints (real-time data)
+- **CDP Wallet Secret**: Auto-generated 32-byte hex for wallet encryption
+
+### API Development
+- Follow FastAPI patterns
+- Use dependency injection (`src/api/dependencies.py`)
+- Implement proper error handling
+- Add WebSocket support for real-time features
+
+## Important Notes
+
+- The project runs continuously (24/7) in production
+- Always test with simulation mode first
+- Monitor costs via GCP billing alerts
+- Check logs regularly for agent decisions
+- CDP SDK requires Rust for compilation (handled in Dockerfile)
+
+## Recent Updates (July 2025)
+
+### Aerodrome V2 Support
+- Added fallback to storage slot reading when getReserves() fails
+- Updated pool addresses to official Aerodrome V2 pools
+- Enhanced decimal handling for different token configurations
+
+### API Keys Configuration
+- CDP Client API Key required for authenticated RPC access
+- Google AI API key uses Gemini 1.5 Flash model
+- Mem0 Pro plan required for graph memories feature
+
+### Known Issues
+- Some Aerodrome V2 pools don't implement standard Uniswap V2 interface
+- getReserves() may revert - system automatically falls back to storage reading
+- Mem0 API may show "free plan" errors if API key is not properly configured

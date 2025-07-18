@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     cdp_api_key: Optional[str] = Field(None, env="CDP_API_KEY_ID")
     cdp_api_secret: Optional[str] = Field(None, env="CDP_API_KEY_SECRET")
     cdp_wallet_secret: Optional[str] = Field(None, env="CDP_WALLET_SECRET")
+    cdp_client_api_key: Optional[str] = Field(None, env="CDP_CLIENT_API_KEY")
     
     @validator("cdp_api_key", pre=False, always=True)
     def load_cdp_api_key(cls, v, values):
@@ -90,6 +91,15 @@ class Settings(BaseSettings):
     base_rpc_url: str = Field(..., env="BASE_RPC_URL")
     chain_id: int = Field(default=8453, env="CHAIN_ID")
     
+    @property
+    def cdp_rpc_url(self) -> str:
+        """Get CDP RPC URL with authentication."""
+        # Use CDP CLIENT API key for RPC endpoints
+        if self.cdp_client_api_key:
+            return f"https://api.developer.coinbase.com/rpc/v1/base/{self.cdp_client_api_key}"
+        # Fallback to public RPC
+        return self.base_rpc_url
+    
     # Memory Configuration - will be loaded from Secret Manager
     mem0_api_key: Optional[str] = Field(None, env="MEM0_API_KEY")
     
@@ -117,6 +127,19 @@ class Settings(BaseSettings):
                 return get_secret("cdp-wallet-secret", "CDP_WALLET_SECRET")
             except:
                 return None  # Wallet secret is optional - will be generated if needed
+        return v
+    
+    @validator("cdp_client_api_key", pre=False, always=True)
+    def load_cdp_client_api_key(cls, v, values):
+        if v:
+            return v
+        # Load from Secret Manager if not in env
+        if "gcp_project_id" in values:
+            try:
+                from src.gcp.secret_manager import get_secret
+                return get_secret("cdp-client-api-key", "CDP_CLIENT_API_KEY")
+            except:
+                return None  # Client API key is optional
         return v
     
     # Agent Configuration

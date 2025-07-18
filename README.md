@@ -27,9 +27,9 @@ User Query → LangGraph Agent → Memory (Mem0) → Decision
 
 ### Tech Stack
 
-- **AI/ML**: LangGraph, LangChain, Google Gemini
-- **Memory**: Mem0 + Google Firestore
-- **Blockchain**: CDP SDK v1.23.0 (Ed25519) for Base chain
+- **AI/ML**: LangGraph, Google Gemini 1.5 Flash
+- **Memory**: Mem0 (Pro) + Google Firestore
+- **Blockchain**: CDP SDK v1.24.0 for Base chain
 - **API**: FastAPI + WebSockets
 - **Observability**: LangSmith
 - **Infrastructure**: Google Cloud (Run, Firestore, Pub/Sub, Secret Manager)
@@ -39,9 +39,11 @@ User Query → LangGraph Agent → Memory (Mem0) → Decision
 ### Prerequisites
 
 - Python 3.11+
-- Google Cloud account with Vertex AI enabled
-- CDP API key from Coinbase
-- Base chain RPC access (default provided)
+- Google Cloud account with required APIs enabled
+- CDP API keys from Coinbase Developer Platform (both API Key/Secret and Client API Key)
+- Google AI API key for Gemini
+- Mem0 Pro API key (for persistent memory)
+- Base chain RPC access (CDP authenticated RPC recommended)
 
 ### Installation
 
@@ -70,11 +72,16 @@ python run.py
 # Required environment variables
 GCP_PROJECT_ID=your-project-id
 
-# Secrets (stored in Google Secret Manager)
-- cdp-api-key
-- cdp-api-secret
-- langsmith-api-key (optional)
-- mem0-api-key (optional)
+# Required secrets (stored in Google Secret Manager)
+- cdp-api-key         # CDP API Key ID
+- cdp-api-secret      # CDP API Secret
+- cdp-client-api-key  # CDP Client API Key for authenticated RPC
+- google-api-key      # Google AI API key for Gemini
+- mem0-api-key        # Mem0 Pro API key
+
+# Optional secrets
+- langsmith-api-key   # For observability
+- cdp-wallet-secret   # Auto-generated if not provided
 ```
 
 ## 🧠 How Athena Thinks
@@ -164,6 +171,14 @@ gcloud logging read "resource.type=cloud_run_revision"
 - "Bribes increase 60% before epoch changes"
 - "Volume spikes precede major price movements"
 ```
+
+## 🔧 Aerodrome V2 Compatibility
+
+Athena is fully compatible with Aerodrome V2 pools on Base. The agent:
+- Automatically detects pool interfaces (V1 vs V2)
+- Uses storage slot reading for pools that don't support standard interfaces
+- Maintains a registry of verified pool addresses
+- Handles different decimal configurations for various tokens
 
 ## 🛡️ Security
 

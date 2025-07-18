@@ -182,7 +182,7 @@ class BaseClient:
             )
             
             # Calculate minimum output with slippage
-            min_amount_out = quote * (1 - slippage)
+            min_amount_out = quote * Decimal(str(1 - slippage))
             
             # Build transaction
             deadline = int(asyncio.get_event_loop().time()) + 1200  # 20 minutes
@@ -229,8 +229,8 @@ class BaseClient:
             token_b_address = TOKENS.get(token_b, token_b)
             
             # Calculate minimum amounts with slippage
-            min_amount_a = amount_a * (1 - slippage)
-            min_amount_b = amount_b * (1 - slippage)
+            min_amount_a = amount_a * Decimal(str(1 - slippage))
+            min_amount_b = amount_b * Decimal(str(1 - slippage))
             
             deadline = int(asyncio.get_event_loop().time()) + 1200
             
@@ -284,28 +284,50 @@ class BaseClient:
             if not pool_address:
                 return {}
                 
-            # The CDP SDK v1.23.0 uses smart contracts via the wallet
-            # For read operations, we need to use a different approach
-            # Let's try using the CDP client directly
-            from cdp import SmartContract
+            # Use RPC reader to get real data
+            from src.blockchain.rpc_reader import RPCReader
             
-            # Create contract instances
-            pool_contract = SmartContract(
-                network_id="base-mainnet",
-                contract_address=pool_address,
-                abi=CONTRACTS["pool"]["abi"]
-            )
+            # Use CDP's authenticated RPC endpoint
+            async with RPCReader(settings.cdp_rpc_url) as reader:
+                # Get token info first to determine decimals
+                token_info = await reader.get_token_info(pool_address)
+                if not token_info:
+                    logger.error(f"Failed to read token info for pool {pool_address}")
+                    return {}
+                
+                # Get reserves
+                reserves_data = await reader.get_pool_reserves(pool_address)
+                if not reserves_data:
+                    logger.error(f"Failed to read reserves for pool {pool_address}")
+                    return {}
+                    
+                reserve0 = reserves_data["reserve0"]
+                reserve1 = reserves_data["reserve1"]
+                
+                # Get total supply
+                total_supply_decimal = await reader.get_total_supply(pool_address)
+                if not total_supply_decimal:
+                    total_supply_decimal = Decimal("0")
+                    
+            # Determine decimals based on token addresses
+            # Common Base tokens
+            decimals_map = {
+                "0x4200000000000000000000000000000000000006": 18,  # WETH
+                "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913": 6,   # USDC
+                "0xd9aAEc86B65D86f6A7B5B1b0c42FFA531710b6CA": 6,   # USDbC
+                "0x50c5725949A6F0c72E6C4a641F24049A917DB0Cb": 18,  # DAI
+                "0x940181a94A35A4569E4529A3CDfB74e38FD98631": 18,  # AERO
+            }
             
-            # Read reserves
-            reserves_result = pool_contract.read("getReserves", {})
+            # Get decimals for token0 and token1
+            decimals0 = decimals_map.get(token_info["token0"].lower(), 18)
+            decimals1 = decimals_map.get(token_info["token1"].lower(), 18)
             
-            # Read total supply
-            total_supply_result = pool_contract.read("totalSupply", {})
-            
-            # Parse results
-            reserve0 = Decimal(str(reserves_result[0])) / Decimal(10**18)
-            reserve1 = Decimal(str(reserves_result[1])) / Decimal(10**18)
-            total_supply = Decimal(str(total_supply_result)) / Decimal(10**18)
+            # Apply correct decimals if we got raw values from storage
+            if reserve0 > Decimal(10**30):  # Likely raw value
+                reserve0 = reserve0 / Decimal(10**decimals0)
+            if reserve1 > Decimal(10**30):  # Likely raw value  
+                reserve1 = reserve1 / Decimal(10**decimals1)
             
             # Calculate TVL (simplified - assumes $1 per token for now)
             # In production, you'd fetch actual token prices
@@ -321,7 +343,7 @@ class BaseClient:
                 "stable": stable,
                 "reserve0": reserve0,
                 "reserve1": reserve1,
-                "total_supply": total_supply,
+                "total_supply": total_supply_decimal,
                 "tvl": tvl,
                 "ratio": ratio,
                 "imbalanced": abs(ratio - 1) > Decimal("0.1")  # More than 10% imbalance
@@ -382,21 +404,56 @@ class BaseClient:
     ) -> Optional[str]:
         """Get pool address from factory."""
         try:
-            # Use SmartContract for read operations
-            from cdp import SmartContract
+            # Get token addresses
+            token_a_address = TOKENS.get(token_a, token_a)
+            token_b_address = TOKENS.get(token_b, token_b)
             
-            factory_contract = SmartContract(
-                network_id="base-mainnet",
-                contract_address=CONTRACTS["factory"]["address"],
-                abi=CONTRACTS["factory"]["abi"]
-            )
+            # Try to get from factory first using CDP RPC
+            from src.blockchain.rpc_reader import RPCReader
             
-            result = factory_contract.read("getPair", {
-                "tokenA": token_a,
-                "tokenB": token_b,
-                "stable": stable,
-            })
-            return result if result != "0x0000000000000000000000000000000000000000" else None
+            try:
+                async with RPCReader(settings.cdp_rpc_url) as reader:
+                    pool_address = await reader.get_pool_address(
+                        CONTRACTS["factory"]["address"],
+                        token_a_address,
+                        token_b_address,
+                        stable
+                    )
+                    
+                if pool_address:
+                    logger.info(f"Found pool at {pool_address} for {token_a}/{token_b} stable={stable}")
+                    return pool_address
+            except Exception as e:
+                logger.warning(f"Failed to query factory: {e}")
+            
+            # Fallback to known pools
+            known_pools = {
+                # WETH-USDC volatile (Aerodrome V2 official)
+                (TOKENS["WETH"].lower(), TOKENS["USDC"].lower(), False): "0xd0b53D9277642d899DF5C87A3966A349A798F224",
+                (TOKENS["USDC"].lower(), TOKENS["WETH"].lower(), False): "0xd0b53D9277642d899DF5C87A3966A349A798F224",
+                
+                # AERO-USDC volatile
+                ("0x940181a94a35a4569e4529a3cdfb74e38fd98631".lower(), TOKENS["USDC"].lower(), False): "0x6cDcb1C4A4D1C3C6d054b27AC5B77e89eAFb971d",
+                (TOKENS["USDC"].lower(), "0x940181a94a35a4569e4529a3cdfb74e38fd98631".lower(), False): "0x6cDcb1C4A4D1C3C6d054b27AC5B77e89eAFb971d",
+                
+                # Add more verified pools as needed
+            }
+            
+            # Check known pools
+            pool_key = (token_a_address.lower(), token_b_address.lower(), stable)
+            pool_address = known_pools.get(pool_key)
+            if not pool_address:
+                # Check reverse order
+                pool_key = (token_b_address.lower(), token_a_address.lower(), stable)
+                pool_address = known_pools.get(pool_key)
+            
+            if pool_address:
+                logger.info(f"Using known pool at {pool_address} for {token_a}/{token_b} stable={stable}")
+                return pool_address
+            else:
+                logger.warning(f"No pool found for {token_a}/{token_b} stable={stable}")
+                return None
+                
         except Exception as e:
             logger.error(f"Failed to get pool address: {e}")
             return None
