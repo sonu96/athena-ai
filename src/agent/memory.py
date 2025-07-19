@@ -109,7 +109,16 @@ class AthenaMemory:
             # Ensure content is JSON serializable
             if isinstance(content, dict):
                 import json
-                content_str = json.dumps(content, default=str)
+                # Custom JSON encoder for Decimal and other types
+                def decimal_default(obj):
+                    if isinstance(obj, Decimal):
+                        return float(obj)
+                    elif isinstance(obj, datetime):
+                        return obj.isoformat()
+                    elif hasattr(obj, '__dict__'):
+                        return str(obj)
+                    return str(obj)
+                content_str = json.dumps(content, default=decimal_default)
             else:
                 content_str = str(content)
                 
@@ -146,7 +155,12 @@ class AthenaMemory:
                 # Handle different response formats from Mem0
                 if isinstance(result, list) and len(result) > 0:
                     # New format returns a list
-                    memory_id = result[0].get('id', '')
+                    first_item = result[0]
+                    if isinstance(first_item, dict):
+                        memory_id = first_item.get('id', '')
+                    else:
+                        # If it's a string ID directly
+                        memory_id = str(first_item) if first_item else ''
                 elif isinstance(result, dict):
                     # Old format
                     memory_id = result.get('id', result.get('results', [{}])[0].get('id', ''))
@@ -332,9 +346,19 @@ class AthenaMemory:
             success: Whether it was successful
         """
         try:
+            # Custom JSON encoder for Decimal and other types
+            def decimal_default(obj):
+                if isinstance(obj, Decimal):
+                    return float(obj)
+                elif isinstance(obj, datetime):
+                    return obj.isoformat()
+                elif hasattr(obj, '__dict__'):
+                    return str(obj)
+                return str(obj)
+            
             # Store outcome
             await self.remember(
-                content=f"Strategy '{strategy}' {'succeeded' if success else 'failed'}: {json.dumps(outcome)}",
+                content=f"Strategy '{strategy}' {'succeeded' if success else 'failed'}: {json.dumps(outcome, default=decimal_default)}",
                 memory_type=MemoryType.OUTCOME,
                 category="strategy_performance",
                 metadata={

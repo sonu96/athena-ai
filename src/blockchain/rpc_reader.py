@@ -18,6 +18,7 @@ class RPCReader:
         """Initialize RPC reader."""
         self.rpc_url = rpc_url
         self.session = None
+        logger.info(f"RPC Reader initialized with URL: {rpc_url[:50]}...")
         
     async def __aenter__(self):
         """Enter async context."""

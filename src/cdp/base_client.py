@@ -428,11 +428,13 @@ class BaseClient:
             
             # Fallback to known pools
             known_pools = {
-                # WETH-USDC volatile (Aerodrome V2 official)
-                (TOKENS["WETH"].lower(), TOKENS["USDC"].lower(), False): "0xd0b53D9277642d899DF5C87A3966A349A798F224",
-                (TOKENS["USDC"].lower(), TOKENS["WETH"].lower(), False): "0xd0b53D9277642d899DF5C87A3966A349A798F224",
+                # WETH-USDC volatile (Standard AMM) - verified working
+                (TOKENS["WETH"].lower(), TOKENS["USDC"].lower(), False): "0xcDAc0d6c6C59727a65F871236188350531885C43",
+                (TOKENS["USDC"].lower(), TOKENS["WETH"].lower(), False): "0xcDAc0d6c6C59727a65F871236188350531885C43",
                 
-                # AERO-USDC volatile
+                # Note: SlipStream pool 0xb2cc224c1c9fee385f8ad6a55b4d94e92359dc59 uses different interface
+                
+                # AERO-USDC volatile (verified working)
                 ("0x940181a94a35a4569e4529a3cdfb74e38fd98631".lower(), TOKENS["USDC"].lower(), False): "0x6cDcb1C4A4D1C3C6d054b27AC5B77e89eAFb971d",
                 (TOKENS["USDC"].lower(), "0x940181a94a35a4569e4529a3cdfb74e38fd98631".lower(), False): "0x6cDcb1C4A4D1C3C6d054b27AC5B77e89eAFb971d",
                 
