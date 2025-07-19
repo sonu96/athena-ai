@@ -3,8 +3,8 @@ Athena AI Agent Core - LangGraph Implementation
 """
 import asyncio
 import logging
-from typing import Dict, List, TypedDict, Annotated, Sequence
-from datetime import datetime
+from typing import Dict, List, TypedDict, Annotated, Sequence, Optional
+from datetime import datetime, timedelta
 from decimal import Decimal
 
 from langgraph.graph import StateGraph, END
@@ -36,10 +36,11 @@ class AthenaAgent:
     Built with LangGraph for structured reasoning and decision-making.
     """
     
-    def __init__(self, memory: AthenaMemory, base_client: BaseClient):
+    def __init__(self, memory: AthenaMemory, base_client: BaseClient, firestore_client=None):
         """Initialize Athena's consciousness."""
         self.memory = memory
         self.base_client = base_client
+        self.firestore = firestore_client
         # Initialize Gemini directly without LangChain
         if settings.google_api_key:
             genai.configure(api_key=settings.google_api_key)
@@ -72,6 +73,10 @@ class AthenaAgent:
         
         # Build the graph
         self.graph = self._build_graph()
+        
+        # Track observation mode
+        self.observation_start = datetime.fromisoformat(settings.observation_start_time) if settings.observation_start_time else datetime.utcnow()
+        self.patterns_discovered = []
         
     def _build_graph(self) -> StateGraph:
         """Build Athena's reasoning graph."""
@@ -254,6 +259,14 @@ class AthenaAgent:
         """Form theories about market behavior."""
         logger.info("=� Forming theories...")
         
+        # Extract pattern data for enhanced analysis
+        current_hour = datetime.utcnow().hour
+        current_day = datetime.utcnow().strftime("%A")
+        
+        # Analyze gas patterns
+        gas_observations = [obs for obs in state["observations"] if obs["type"] == "gas"]
+        pool_observations = [obs for obs in state["observations"] if obs["type"] == "pools"]
+        
         prompt = f"""
         Based on this analysis:
         {state['current_analysis']}
@@ -261,12 +274,19 @@ class AthenaAgent:
         And these observations:
         {state['observations']}
         
-        Form 2-3 specific theories about:
-        1. Why certain patterns are occurring
-        2. What opportunities might arise
-        3. Potential risks to watch for
+        Current time context:
+        - Hour: {current_hour} UTC
+        - Day: {current_day}
         
-        Be specific and actionable.
+        Form 3-5 specific theories about:
+        1. Time-based patterns (hourly, daily, weekly trends)
+        2. Gas price correlations with activity
+        3. Pool APR fluctuations and causes
+        4. Volume patterns and liquidity movements
+        5. Potential arbitrage windows
+        
+        Format each theory as: "PATTERN_TYPE: specific observation"
+        Be specific, measurable, and actionable.
         """
         
         if self.model:
@@ -278,8 +298,38 @@ class AthenaAgent:
         
         state["theories"] = theories
         
-        # Store promising theories
-        for theory in theories[:2]:  # Top 2 theories
+        # Enhanced pattern storage during observation mode
+        if self._is_observation_mode() and self.firestore:
+            for theory in theories:
+                if ":" in theory:
+                    pattern_type, description = theory.split(":", 1)
+                    pattern_type = pattern_type.strip()
+                    description = description.strip()
+                    
+                    # Categorize and store patterns
+                    pattern_data = {
+                        "type": pattern_type,
+                        "description": description,
+                        "hour": current_hour,
+                        "day": current_day,
+                        "gas_price": gas_observations[0]["data"]["price"] if gas_observations else None,
+                        "high_apr_pools": pool_observations[0]["data"]["high_apr_pools"] if pool_observations else [],
+                        "confidence": 0.5,  # Initial confidence
+                        "context": {
+                            "analysis": state['current_analysis'][:500],  # First 500 chars
+                            "observations_count": len(state["observations"]),
+                            "memory_count": len(state.get("memories", []))
+                        }
+                    }
+                    
+                    # Save pattern to Firestore
+                    pattern_id = self.firestore.save_pattern(pattern_data)
+                    if pattern_id:
+                        self.patterns_discovered.append(pattern_id)
+                        logger.info(f"📊 Discovered pattern: {pattern_type} - {description[:50]}...")
+        
+        # Store promising theories in memory
+        for theory in theories[:3]:  # Top 3 theories
             await self.memory.remember(
                 content=theory,
                 memory_type=MemoryType.PATTERN,
@@ -295,7 +345,35 @@ class AthenaAgent:
         
         decisions = []
         
-        # Evaluate each active strategy
+        # If just transitioned from observation mode, use learned patterns
+        if not self._is_observation_mode() and self.firestore:
+            # Check if we recently transitioned (within last hour)
+            observation_end = self.observation_start + timedelta(days=settings.observation_days)
+            time_since_transition = datetime.utcnow() - observation_end
+            
+            if 0 <= time_since_transition.total_seconds() < 3600:  # Within first hour
+                logger.info("🎯 Using high-confidence patterns from observation period")
+                
+                # Get high confidence patterns
+                high_conf_patterns = self.firestore.get_high_confidence_patterns(settings.min_pattern_confidence)
+                
+                # Apply pattern-based decision making
+                for pattern in high_conf_patterns:
+                    if self._pattern_matches_current_state(pattern, state):
+                        # Create decision based on pattern
+                        strategy = self._pattern_to_strategy(pattern)
+                        if strategy:
+                            decisions.append({
+                                "strategy": strategy["name"],
+                                "action": "execute",
+                                "confidence": pattern["confidence"],
+                                "parameters": strategy["parameters"],
+                                "pattern_based": True,
+                                "pattern_id": pattern["id"]
+                            })
+                            logger.info(f"📍 Pattern match: {pattern['type']} - {pattern['description'][:50]}...")
+        
+        # Regular strategy evaluation
         for strategy_name, strategy_config in STRATEGIES.items():
             if not strategy_config["enabled"]:
                 continue
@@ -308,12 +386,14 @@ class AthenaAgent:
             )
             
             if should_execute:
-                decisions.append({
-                    "strategy": strategy_name,
-                    "action": "execute",
-                    "confidence": self.emotions["confidence"],
-                    "parameters": strategy_config,
-                })
+                # Don't duplicate pattern-based decisions
+                if not any(d["strategy"] == strategy_name and d.get("pattern_based") for d in decisions):
+                    decisions.append({
+                        "strategy": strategy_name,
+                        "action": "execute",
+                        "confidence": self.emotions["confidence"],
+                        "parameters": strategy_config,
+                    })
                 
         state["decisions"] = decisions
         
@@ -426,7 +506,29 @@ class AthenaAgent:
         
     def _should_execute(self, state: AgentState) -> str:
         """Determine if we should execute strategies."""
+        # Check if we're still in observation mode
+        if self._is_observation_mode():
+            logger.info("🔍 Still in observation mode - collecting patterns, no trades")
+            return "wait"  # Always wait during observation
+        
         return state.get("next_action", "wait")
+    
+    def _is_observation_mode(self) -> bool:
+        """Check if agent is still in observation mode."""
+        if not settings.observation_mode:
+            return False
+            
+        # Calculate if observation period has ended
+        observation_end = self.observation_start + timedelta(days=settings.observation_days)
+        current_time = datetime.utcnow()
+        
+        if current_time < observation_end:
+            remaining = observation_end - current_time
+            logger.info(f"📊 Observation mode: {remaining.days}d {remaining.seconds//3600}h remaining")
+            return True
+        else:
+            logger.info("✅ Observation period complete - ready to trade!")
+            return False
         
     async def _evaluate_strategy(
         self,
@@ -682,3 +784,66 @@ class AthenaAgent:
         """Normalize emotional values to prevent extremes."""
         for emotion in self.emotions:
             self.emotions[emotion] = max(0.1, min(0.9, self.emotions[emotion]))
+    
+    def _pattern_matches_current_state(self, pattern: Dict, state: AgentState) -> bool:
+        """Check if a pattern matches current market state."""
+        current_hour = datetime.utcnow().hour
+        current_day = datetime.utcnow().strftime("%A")
+        
+        # Check time-based patterns
+        if pattern.get("hour") is not None:
+            # Allow 1 hour window
+            if abs(current_hour - pattern["hour"]) > 1:
+                return False
+                
+        if pattern.get("day") and pattern["day"] != current_day:
+            return False
+            
+        # Check gas price patterns
+        if pattern.get("gas_price"):
+            gas_obs = next((obs for obs in state["observations"] if obs["type"] == "gas"), None)
+            if gas_obs:
+                current_gas = float(gas_obs["data"]["price"])
+                pattern_gas = float(pattern["gas_price"])
+                # Allow 20% variance
+                if abs(current_gas - pattern_gas) / pattern_gas > 0.2:
+                    return False
+                    
+        return True
+        
+    def _pattern_to_strategy(self, pattern: Dict) -> Optional[Dict]:
+        """Convert a pattern to an actionable strategy."""
+        pattern_type = pattern.get("type", "").lower()
+        description = pattern.get("description", "").lower()
+        
+        # Map patterns to strategies
+        if "arbitrage" in pattern_type or "price discrepancy" in description:
+            return {
+                "name": "arbitrage",
+                "parameters": {
+                    "enabled": True,
+                    "min_profit": 5.0,  # Conservative for pattern-based
+                    "max_gas_percent": 0.25,
+                }
+            }
+        elif "high apr" in description or "liquidity" in pattern_type:
+            return {
+                "name": "liquidity_provision",
+                "parameters": {
+                    "enabled": True,
+                    "min_apr": pattern.get("min_apr", 25.0),
+                    "max_il_tolerance": 0.04,  # More conservative
+                }
+            }
+        elif "gas" in pattern_type and ("low" in description or "optimal" in description):
+            # Good time for any gas-intensive operation
+            return {
+                "name": "yield_farming",
+                "parameters": {
+                    "enabled": True,
+                    "compound_frequency": 7200,  # 2 hours during low gas
+                    "min_pending_rewards": 3.0,
+                }
+            }
+            
+        return None

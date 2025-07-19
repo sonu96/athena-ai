@@ -148,6 +148,12 @@ class Settings(BaseSettings):
     agent_max_position_size: float = Field(default=1000.0, env="AGENT_MAX_POSITION_SIZE")  # USD
     agent_risk_limit: float = Field(default=0.02, env="AGENT_RISK_LIMIT")  # 2% max loss
     
+    # Observation Mode Configuration
+    observation_mode: bool = Field(default=True, env="OBSERVATION_MODE")  # Start in observation mode
+    observation_days: int = Field(default=3, env="OBSERVATION_DAYS")  # Days to observe before trading
+    observation_start_time: Optional[str] = Field(None, env="OBSERVATION_START_TIME")  # ISO format
+    min_pattern_confidence: float = Field(default=0.7, env="MIN_PATTERN_CONFIDENCE")  # Min confidence to act on patterns
+    
     # API Configuration
     api_port: int = Field(default=8000, env="API_PORT")
     api_host: str = Field(default="0.0.0.0", env="API_HOST")

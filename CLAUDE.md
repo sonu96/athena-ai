@@ -210,6 +210,45 @@ Without CDP Client API Key, the system falls back to public RPC (rate limited).
 
 ## Recent Updates (July 2025)
 
+### Observation Mode
+Athena now starts in observation mode to learn market patterns before trading:
+
+#### Configuration
+```bash
+# Enable observation mode (default: true)
+export OBSERVATION_MODE=true
+
+# Set observation period in days (default: 3)
+export OBSERVATION_DAYS=3
+
+# Minimum pattern confidence to act on (default: 0.7)
+export MIN_PATTERN_CONFIDENCE=0.7
+```
+
+#### How It Works
+1. **Pattern Collection**: During observation, the agent:
+   - Monitors market conditions 24/7
+   - Identifies time-based patterns (hourly, daily)
+   - Tracks gas price correlations
+   - Discovers pool APR fluctuations
+   - Records arbitrage opportunities
+
+2. **Pattern Storage**: Patterns are stored in Firestore with:
+   - Pattern type and description
+   - Time context (hour, day)
+   - Market conditions when discovered
+   - Confidence scores that improve over time
+
+3. **Transition to Trading**: After observation period:
+   - High-confidence patterns guide initial trades
+   - Conservative parameters for pattern-based decisions
+   - Continuous learning and pattern refinement
+
+4. **Monitoring Progress**:
+   - Check `observation_metrics` collection in Firestore
+   - View discovered patterns in `observed_patterns`
+   - Track confidence scores in `pattern_confidence`
+
 ### Aerodrome V2 Support
 - Added fallback to storage slot reading when getReserves() fails
 - Updated pool addresses to official Aerodrome V2 pools
