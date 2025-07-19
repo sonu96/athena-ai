@@ -139,19 +139,22 @@ class AthenaAgent:
                 "timestamp": datetime.utcnow().isoformat()
             })
             
-            # Get real pool data
-            pool_info = await self.base_client.get_pool_info("WETH", "USDC", False)
-            if pool_info:
+            # Try to get real pool data
+            try:
+                pool_info = await self.base_client.get_pool_info("WETH", "USDC", False)
+                if pool_info:
+                    observations.append({
+                        "type": "pools",
+                        "data": pool_info,
+                        "timestamp": datetime.utcnow().isoformat()
+                    })
+            except Exception as e:
+                logger.error(f"Failed to get pool info: {e}")
                 observations.append({
-                "type": "pools",
-                "data": {
-                    "high_apr_pools": [
-                        {"pair": "WETH/USDC", "apr": 45.2, "tvl": 1000000},
-                        {"pair": "AERO/USDC", "apr": 89.5, "tvl": 500000},
-                    ]
-                },
-                "timestamp": datetime.utcnow().isoformat()
-            })
+                    "type": "error",
+                    "data": {"error": f"Pool data unavailable: {str(e)}", "pool": "WETH/USDC"},
+                    "timestamp": datetime.utcnow().isoformat()
+                })
             
             # Store observations in memory
             for obs in observations:
@@ -313,7 +316,7 @@ class AthenaAgent:
                         "hour": current_hour,
                         "day": current_day,
                         "gas_price": gas_observations[0]["data"]["price"] if gas_observations else None,
-                        "high_apr_pools": pool_observations[0]["data"]["high_apr_pools"] if pool_observations else [],
+                        "high_apr_pools": pool_observations[0]["data"].get("high_apr_pools", []) if pool_observations and "data" in pool_observations[0] else [],
                         "confidence": 0.5,  # Initial confidence
                         "context": {
                             "analysis": state['current_analysis'][:500],  # First 500 chars

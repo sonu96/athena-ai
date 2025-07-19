@@ -106,9 +106,16 @@ class AthenaMemory:
             )
             
             # Add to Mem0
+            # Ensure content is JSON serializable
+            if isinstance(content, dict):
+                import json
+                content_str = json.dumps(content, default=str)
+            else:
+                content_str = str(content)
+                
             messages = [{
                 "role": "assistant",
-                "content": f"[{memory_type.value}] {content}"
+                "content": f"[{memory_type.value}] {content_str}"
             }]
             
             if self.memory:
@@ -118,7 +125,7 @@ class AthenaMemory:
                     if isinstance(v, datetime):
                         safe_metadata[k] = v.isoformat()
                     elif isinstance(v, Decimal):
-                        safe_metadata[k] = str(v)
+                        safe_metadata[k] = float(v)
                     elif hasattr(v, '__dict__'):
                         safe_metadata[k] = str(v)
                     else:
@@ -135,7 +142,17 @@ class AthenaMemory:
                         "timestamp": entry.timestamp.isoformat(),
                     }
                 )
-                memory_id = result.get('id', result.get('results', [{}])[0].get('id', ''))
+                
+                # Handle different response formats from Mem0
+                if isinstance(result, list) and len(result) > 0:
+                    # New format returns a list
+                    memory_id = result[0].get('id', '')
+                elif isinstance(result, dict):
+                    # Old format
+                    memory_id = result.get('id', result.get('results', [{}])[0].get('id', ''))
+                else:
+                    logger.warning(f"Unexpected Mem0 response format: {type(result)}")
+                    memory_id = ''
             else:
                 # Use local storage
                 import uuid

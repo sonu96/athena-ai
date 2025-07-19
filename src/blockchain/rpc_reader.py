@@ -165,27 +165,37 @@ class RPCReader:
                     "reserve1": reserve1
                 }
             
-            # If getReserves() fails, try Aerodrome V2 storage layout
-            # Aerodrome V2 stores reserves in different slots
-            logger.info(f"Trying Aerodrome V2 storage layout for pool {pool_address}")
+            # If getReserves() fails, try reading from storage slot 0x8 (Uniswap V2 layout)
+            logger.info(f"Trying storage slot reading for pool {pool_address}")
             
-            # Read reserve0 from slot 1
-            reserve0_data = await self.get_storage_at(pool_address, "0x1")
-            # Read reserve1 from slot 2  
-            reserve1_data = await self.get_storage_at(pool_address, "0x2")
+            # Uniswap V2 and many forks store reserves in slot 8
+            # Format: reserve0 (112 bits) | reserve1 (112 bits) | blockTimestampLast (32 bits)
+            storage_data = await self.get_storage_at(pool_address, "0x8")
             
-            if reserve0_data and reserve1_data:
-                reserve0 = Decimal(int(reserve0_data, 16))
-                reserve1 = Decimal(int(reserve1_data, 16))
+            if storage_data and storage_data != "0x0":
+                # Remove 0x prefix
+                data = storage_data[2:]
                 
-                # Only return if values seem reasonable (not 0 or extremely large)
-                if reserve0 > 0 and reserve1 > 0 and reserve0 < Decimal(10**40) and reserve1 < Decimal(10**40):
-                    # Determine decimals - WETH=18, USDC=6
-                    # This is a simplified approach - in production, we'd read token decimals
-                    return {
-                        "reserve0": reserve0 / Decimal(10**18),  # Assume 18 decimals for now
-                        "reserve1": reserve1 / Decimal(10**18)   # Will be corrected by caller
-                    }
+                # Parse packed data (right to left):
+                # - Last 8 chars (32 bits): blockTimestampLast
+                # - Next 28 chars (112 bits): reserve1
+                # - Next 28 chars (112 bits): reserve0
+                
+                if len(data) >= 64:
+                    # Extract reserves (112 bits = 28 hex chars each)
+                    reserve1_hex = data[-40:-8]  # Skip timestamp, get reserve1
+                    reserve0_hex = data[-68:-40]  # Get reserve0
+                    
+                    reserve0 = Decimal(int(reserve0_hex, 16))
+                    reserve1 = Decimal(int(reserve1_hex, 16))
+                    
+                    # Only return if values seem reasonable
+                    if reserve0 > 0 and reserve1 > 0:
+                        # Note: decimals will be handled by the caller based on token info
+                        return {
+                            "reserve0": reserve0,
+                            "reserve1": reserve1
+                        }
             
             return None
             
