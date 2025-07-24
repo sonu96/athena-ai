@@ -13,6 +13,7 @@ load_dotenv()
 from src.agent.core import AthenaAgent
 from src.agent.memory import AthenaMemory
 from src.cdp.base_client import BaseClient
+from src.gcp.firestore_client import FirestoreClient
 from src.collectors.gas_monitor import GasMonitor
 from src.collectors.pool_scanner import PoolScanner
 from src.api.main import app, set_agent_references
@@ -42,13 +43,14 @@ async def start_agent():
     # Initialize components
     memory = AthenaMemory()
     base_client = BaseClient()
+    firestore = FirestoreClient()
     
     # Initialize CDP client
     await base_client.initialize()
     print(f"💳 Wallet address: {base_client.address}")
     
-    # Create agent
-    agent = AthenaAgent(memory, base_client)
+    # Create agent with firestore client
+    agent = AthenaAgent(memory, base_client, firestore)
     
     # Start collectors
     gas_monitor = GasMonitor(base_client, memory)
