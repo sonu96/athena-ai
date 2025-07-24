@@ -30,12 +30,19 @@ class MemoryType(str, Enum):
 ```
 
 **Memory Categories** (from `config/settings.py`):
-- `observations`: Market state observations
-- `pool_analysis`: Liquidity pool insights
-- `gas_patterns`: Gas price patterns
-- `strategies`: Trading strategies
-- `decisions`: Decision history
-- `emotions`: Emotional state tracking
+- `market_pattern`: Market state observations and patterns
+- `gas_optimization`: Gas price patterns and optimal timing
+- `strategy_performance`: Trading strategy results
+- `pool_behavior`: Liquidity pool insights and behaviors
+- `user_preference`: User-defined preferences
+- `error_learning`: Error tracking and learning
+- `profit_source`: Sources of profitable opportunities
+- `gauge_emissions`: AERO emission rates and patterns (NEW)
+- `volume_tracking`: Real swap volumes from events (NEW)
+- `arbitrage_opportunity`: Detected price imbalances (NEW)
+- `new_pool`: New pool discoveries (NEW)
+- `apr_anomaly`: Unusual APR changes (NEW)
+- `fee_collection`: Fee event tracking (NEW)
 
 **Storage Format**:
 ```python
@@ -170,6 +177,30 @@ MemoryEntry = {
   - `occurrences`: Number of observations
   - `confidence`: Correlation confidence
 
+#### `gauge_data` (NEW - Real Data Collection)
+- Documents: Gauge address as document ID
+- Purpose: Gauge emission data and rewards
+- Fields:
+  - `gauge_address`: Gauge contract address
+  - `pool_address`: Associated pool address
+  - `reward_rate`: AERO tokens per second
+  - `total_supply`: Total LP tokens staked
+  - `aero_per_day`: Daily AERO emissions
+  - `last_update`: Update timestamp
+  - `historical_rates`: Time series of reward rates
+
+#### `event_volumes` (NEW - Real Data Collection)
+- Purpose: Real volume data from on-chain events
+- Fields:
+  - `pool_address`: Pool contract address
+  - `hour_key`: Hour identifier (YYYY-MM-DD-HH)
+  - `swap_volume`: Total swap volume in hour
+  - `fee_volume`: Total fees collected
+  - `swap_count`: Number of swaps
+  - `unique_traders`: Unique addresses
+  - `largest_swap`: Biggest single swap
+  - `timestamp`: Hour timestamp
+
 ### 3. In-Memory Caches
 
 **Gas Monitor Cache** (`src/collectors/gas_monitor.py`):
@@ -192,22 +223,50 @@ pools = {
         "pair": str,
         "address": str,
         "tvl": Decimal,
-        "volume_24h": Decimal,
-        "apr": Decimal,
+        "volume_24h": Decimal,  # Real volume from events
+        "apr": Decimal,         # Real total APR
+        "fee_apr": Decimal,    # Calculated from volume
+        "incentive_apr": Decimal,  # From gauge emissions
         "reserves": Dict[str, Decimal],
         "timestamp": datetime
     }
 }
 ```
 
+**Gauge Reader Cache** (`src/aerodrome/gauge_reader.py`):
+```python
+_gauge_cache = {
+    "pool_address": "gauge_address"
+}
+# TTL: 1 hour to reduce RPC calls
+```
+
+**Event Monitor Cache** (`src/aerodrome/event_monitor.py`):
+```python
+hourly_volumes = {
+    "pool_address": {
+        "YYYY-MM-DD-HH": Decimal  # Volume in that hour
+    }
+}
+daily_volumes = {
+    "pool_address": {
+        "YYYY-MM-DD": Decimal  # Daily total
+    }
+}
+```
+
 ## Data Flow Architecture
 
-### 1. Observation Flow
+### 1. Observation Flow (Enhanced with Real Data)
 ```
 Market Data → Collectors → Memory System → Pattern Detection
      ↓            ↓              ↓                ↓
 CDP Client   Gas Monitor    Mem0 Storage    Firestore
-             Pool Scanner                  (patterns)
+     ↓       Pool Scanner                  (patterns)
+     ↓            ↓                              ↓
+RPC Reader   Gauge Reader                 pool_profiles
+     ↓       Event Monitor                gauge_data
+Blockchain                               event_volumes
 ```
 
 ### 2. Decision Flow
@@ -292,6 +351,56 @@ CDP SDK    Firestore   Agent      Mem0 + Firestore
 - Successful recall percentage
 - Storage growth rate
 
+## Real Data Collection Architecture (NEW)
+
+### Data Sources
+1. **Gauge Contracts**: Direct reads for AERO emission rates
+2. **Event Logs**: Swap and Fee events for volume tracking
+3. **Pool Contracts**: Reserve data and pool parameters
+4. **Voter Contract**: Gauge addresses for pools
+
+### Collection Pipeline
+```
+1. Pool Scanner identifies pools to monitor
+2. Gauge Reader fetches emission data for each pool
+3. Event Monitor tracks swap/fee events in real-time
+4. Real APR calculation combines fee and emission data
+5. Data stored in appropriate Firestore collections
+6. Memory system indexes significant patterns
+```
+
+### APR Calculation Methodology
+- **Fee APR** = (24h_volume × fee_rate × 365) / TVL × 100
+- **Emission APR** = (reward_rate × seconds_per_year × AERO_price) / TVL × 100
+- **Total APR** = Fee APR + Emission APR
+
+### Event Monitoring Strategy
+- Query blocks in 1000-block chunks to prevent timeouts
+- Cache block timestamps to reduce RPC calls
+- Maintain hourly aggregates for efficient 24h calculations
+- Store raw event data for detailed analysis
+
+### Data Quality & Validation
+1. **Volume Verification**:
+   - Cross-reference event volumes with pool state changes
+   - Detect and filter wash trading patterns
+   - Validate against known pool constraints
+
+2. **APR Sanity Checks**:
+   - Flag APRs > 1000% for manual review
+   - Compare calculated vs reported values
+   - Track sudden APR changes as anomalies
+
+3. **Emission Validation**:
+   - Verify gauge exists for pool before reading
+   - Confirm reward rate changes align with epochs
+   - Track total AERO emissions vs protocol limits
+
+4. **Real-time Monitoring**:
+   - Alert on data collection failures
+   - Track RPC response times and errors
+   - Monitor memory usage and storage growth
+
 ## Future Enhancements
 
 1. **Multi-Agent Memory Sharing**: Enable memory synchronization across multiple agents
@@ -299,3 +408,6 @@ CDP SDK    Firestore   Agent      Mem0 + Firestore
 3. **Memory Compression**: Automatic summarization of old memories
 4. **Cross-Chain Patterns**: Pattern recognition across multiple blockchains
 5. **Distributed Storage**: IPFS integration for decentralized memory storage
+6. **Historical Event Replay**: Backfill historical data for pattern learning
+7. **Price Oracle Integration**: Real-time token prices for accurate USD calculations
+8. **Voting Power Analysis**: Track veAERO voting patterns and bribe efficiency

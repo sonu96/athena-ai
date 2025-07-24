@@ -226,6 +226,12 @@ MEMORY_CATEGORIES = [
     "user_preference",
     "error_learning",
     "profit_source",
+    "gauge_emissions",      # AERO emission rates and patterns
+    "volume_tracking",      # Real swap volumes from events
+    "arbitrage_opportunity", # Detected price imbalances
+    "new_pool",             # New pool discoveries
+    "apr_anomaly",          # Unusual APR changes
+    "fee_collection",       # Fee event tracking
 ]
 
 

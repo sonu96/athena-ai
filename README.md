@@ -24,6 +24,8 @@ User Query → LangGraph Agent → Memory (Mem0) → Decision
             CDP Toolkit → Aerodrome → Profit
                     ↓                    ↑
               Learning Loop    Blockchain RPC Reader
+                    ↓                    ↑
+             Event Monitor     Gauge Reader → Real APR
 ```
 
 ### Tech Stack
@@ -31,6 +33,7 @@ User Query → LangGraph Agent → Memory (Mem0) → Decision
 - **AI/ML**: LangGraph, Google Gemini 1.5 Flash
 - **Memory**: Mem0 (Pro) + Google Firestore
 - **Blockchain**: CDP SDK v1.24.0 for Base chain + RPC Reader
+- **DeFi Integration**: Real-time gauge monitoring, event tracking, APR calculation
 - **API**: FastAPI + WebSockets
 - **Observability**: LangSmith
 - **Infrastructure**: Google Cloud (Run, Firestore, Pub/Sub, Secret Manager)
@@ -98,6 +101,9 @@ GCP_PROJECT_ID=your-project-id
 ### Memory Categories
 
 - **Market Intelligence**: Pool performance, gas patterns, volume trends
+- **Gauge Emissions**: Real AERO emission rates and reward patterns
+- **Volume Tracking**: Actual swap volumes from on-chain events
+- **APR Analysis**: Fee APR vs emission APR breakdowns
 - **Strategy Performance**: Success rates, ROI by strategy type
 - **Position Tracking**: Current holdings, historical P&L
 - **Learned Patterns**: Discovered opportunities and market behaviors
@@ -180,6 +186,34 @@ Athena is fully compatible with Aerodrome V2 pools on Base. The agent:
 - Uses storage slot reading for pools that don't support standard interfaces
 - Maintains a registry of verified pool addresses
 - Handles different decimal configurations for various tokens
+
+## 📊 Real Data Collection
+
+Athena now collects real market data instead of using estimates:
+
+### Gauge Integration
+- Reads AERO emission rates directly from gauge contracts
+- Calculates accurate emission APR based on current rewards
+- Monitors gauge total supply and reward distribution
+
+### Event Monitoring
+- Tracks actual swap volumes from on-chain events
+- Monitors fee collection events for accurate fee APR
+- Maintains hourly and daily volume history
+
+### APR Calculation
+- **Fee APR**: Calculated from real 24h volume and pool fees
+- **Emission APR**: Based on actual AERO rewards from gauges
+- **Total APR**: Sum of fee and emission components
+
+### Example Data Flow
+```python
+# Real data collection pipeline
+Pool Scanner → Gauge Reader → Get AERO emissions
+             → Event Monitor → Track swap volumes
+             → Calculate real Fee APR from volume
+             → Store in memory with new categories
+```
 
 ## 🛡️ Security
 

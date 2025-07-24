@@ -91,6 +91,82 @@ CONTRACTS = {
                     {"name": "tokens", "type": "address[][]"},
                     {"name": "tokenId", "type": "uint256"}
                 ]
+            },
+            {
+                "name": "gauges",
+                "type": "function",
+                "inputs": [
+                    {"name": "pool", "type": "address"}
+                ],
+                "outputs": [
+                    {"name": "gauge", "type": "address"}
+                ],
+                "stateMutability": "view"
+            },
+            {
+                "name": "distribute",
+                "type": "function",
+                "inputs": [
+                    {"name": "gauges", "type": "address[]"}
+                ]
+            }
+        ]
+    },
+    "gauge": {
+        "abi": [
+            {
+                "name": "deposit",
+                "type": "function",
+                "inputs": [
+                    {"name": "amount", "type": "uint256"},
+                    {"name": "tokenId", "type": "uint256"}
+                ]
+            },
+            {
+                "name": "withdraw",
+                "type": "function",
+                "inputs": [
+                    {"name": "amount", "type": "uint256"}
+                ]
+            },
+            {
+                "name": "getReward",
+                "type": "function",
+                "inputs": [
+                    {"name": "account", "type": "address"},
+                    {"name": "tokens", "type": "address[]"}
+                ]
+            },
+            {
+                "name": "earned",
+                "type": "function",
+                "inputs": [
+                    {"name": "account", "type": "address"},
+                    {"name": "token", "type": "address"}
+                ],
+                "outputs": [
+                    {"name": "amount", "type": "uint256"}
+                ],
+                "stateMutability": "view"
+            },
+            {
+                "name": "rewardRate",
+                "type": "function",
+                "inputs": [
+                    {"name": "token", "type": "address"}
+                ],
+                "outputs": [
+                    {"name": "rate", "type": "uint256"}
+                ],
+                "stateMutability": "view"
+            },
+            {
+                "name": "totalSupply",
+                "type": "function",
+                "outputs": [
+                    {"name": "supply", "type": "uint256"}
+                ],
+                "stateMutability": "view"
             }
         ]
     },
@@ -135,6 +211,38 @@ CONTRACTS = {
                 "type": "function",
                 "inputs": [],
                 "outputs": [{"name": "", "type": "address"}]
+            },
+            {
+                "name": "Swap",
+                "type": "event",
+                "anonymous": false,
+                "inputs": [
+                    {"indexed": true, "name": "sender", "type": "address"},
+                    {"indexed": false, "name": "amount0In", "type": "uint256"},
+                    {"indexed": false, "name": "amount1In", "type": "uint256"},
+                    {"indexed": false, "name": "amount0Out", "type": "uint256"},
+                    {"indexed": false, "name": "amount1Out", "type": "uint256"},
+                    {"indexed": true, "name": "to", "type": "address"}
+                ]
+            },
+            {
+                "name": "Sync",
+                "type": "event",
+                "anonymous": false,
+                "inputs": [
+                    {"indexed": false, "name": "reserve0", "type": "uint256"},
+                    {"indexed": false, "name": "reserve1", "type": "uint256"}
+                ]
+            },
+            {
+                "name": "Fees",
+                "type": "event",
+                "anonymous": false,
+                "inputs": [
+                    {"indexed": true, "name": "sender", "type": "address"},
+                    {"indexed": false, "name": "amount0", "type": "uint256"},
+                    {"indexed": false, "name": "amount1", "type": "uint256"}
+                ]
             }
         ]
     }

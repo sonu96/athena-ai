@@ -299,7 +299,41 @@ predictions = pool_profiles.predict_opportunities(next_hour)
 correlations = await memory.get_cross_pool_correlations()
 ```
 
+### Real Data Collection (July 2025)
+Athena now collects real market data from Aerodrome:
+
+#### Components
+1. **Gauge Reader** (`src/aerodrome/gauge_reader.py`)
+   - Reads AERO emission rates from gauge contracts
+   - Calculates emission APR based on TVL
+   - Caches gauge addresses for efficiency
+
+2. **Event Monitor** (`src/aerodrome/event_monitor.py`)
+   - Tracks Swap events for real volume data
+   - Monitors Fee events for fee collection
+   - Maintains hourly/daily volume history
+
+3. **Enhanced Pool Scanner** (`src/collectors/pool_scanner.py`)
+   - Uses real gauge emissions instead of hardcoded values
+   - Calculates fee APR from actual 24h volume
+   - Stores comprehensive data in memory
+
+#### New Memory Categories
+- `gauge_emissions`: AERO emission rates and patterns
+- `volume_tracking`: Real swap volumes from events
+- `arbitrage_opportunity`: Detected price imbalances
+- `new_pool`: New pool discoveries
+- `apr_anomaly`: Unusual APR changes
+- `fee_collection`: Fee event tracking
+
+#### Testing Real Data
+```bash
+# Test the real data collection pipeline
+python test_real_data_collection.py
+```
+
 ### Known Issues
 - Some Aerodrome V2 pools don't implement standard Uniswap V2 interface
 - getReserves() may revert - system automatically falls back to storage reading
 - Mem0 API may show "free plan" errors if API key is not properly configured
+- Event monitoring requires authenticated RPC for best performance

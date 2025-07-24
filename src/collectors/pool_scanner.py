@@ -9,6 +9,8 @@ from decimal import Decimal
 
 from src.cdp.base_client import BaseClient
 from src.agent.memory import AthenaMemory, MemoryType
+from src.aerodrome.gauge_reader import GaugeReader
+from src.aerodrome.event_monitor import EventMonitor
 from config.contracts import TOKENS
 
 logger = logging.getLogger(__name__)
@@ -40,6 +42,12 @@ class PoolScanner:
             "imbalanced": [],
         }
         
+        # Gauge reader for real APR data
+        self.gauge_reader = None
+        
+        # Event monitor for volume tracking
+        self.event_monitor = None
+        
     async def start_scanning(self):
         """Start continuous pool scanning."""
         if self.scanning:
@@ -67,6 +75,28 @@ class PoolScanner:
         """Single scanning cycle."""
         logger.info("Scanning Aerodrome pools...")
         
+        # Initialize gauge reader and event monitor if needed
+        if not self.gauge_reader:
+            from src.blockchain.rpc_reader import RPCReader
+            from config.settings import settings
+            rpc_reader = RPCReader(settings.cdp_rpc_url)
+            self.gauge_reader = GaugeReader(rpc_reader)
+            
+        if not self.event_monitor:
+            from src.blockchain.rpc_reader import RPCReader
+            from config.settings import settings
+            self.event_monitor = EventMonitor()
+            # Start monitoring for known pools
+            pool_addresses = []
+            for pair in self._get_pairs_to_scan():
+                pool_info = await self.base_client.get_pool_info(
+                    pair["token_a"], pair["token_b"], pair["stable"]
+                )
+                if pool_info and pool_info.get("address"):
+                    pool_addresses.append(pool_info["address"])
+            if pool_addresses:
+                await self.event_monitor.start_monitoring(pool_addresses)
+        
         # Get major token pairs to scan
         pairs_to_scan = self._get_pairs_to_scan()
         
@@ -78,13 +108,14 @@ class PoolScanner:
             "imbalanced": [],
         }
         
-        for pair in pairs_to_scan:
-            pool_data = await self._scan_pool(pair["token_a"], pair["token_b"], pair["stable"])
-            
-            if pool_data:
-                # Categorize opportunity
-                await self._categorize_opportunity(pool_data, new_opportunities)
+        async with self.gauge_reader:
+            for pair in pairs_to_scan:
+                pool_data = await self._scan_pool(pair["token_a"], pair["token_b"], pair["stable"])
                 
+                if pool_data:
+                    # Categorize opportunity
+                    await self._categorize_opportunity(pool_data, new_opportunities)
+                    
         # Update opportunities
         self.opportunities = new_opportunities
         self.last_scan = datetime.utcnow()
@@ -115,16 +146,23 @@ class PoolScanner:
             if not pool_info:
                 return None
                 
+            # Calculate real APRs
+            pool_address = pool_info.get("address")
+            volume_24h = await self._estimate_volume(pool_info, stable)
+            total_apr, fee_apr, emission_apr = await self._calculate_real_apr(
+                pool_info, pool_address, stable
+            )
+            
             # Use real data from CDP
             pool_data = {
                 "pair": f"{token_a}/{token_b}",
-                "address": pool_info.get("address"),
+                "address": pool_address,
                 "stable": stable,
                 "tvl": pool_info.get("tvl", Decimal("0")),
-                "volume_24h": await self._estimate_volume(pool_info, stable),
-                "apr": await self._calculate_real_apr(pool_info, stable),
-                "fee_apr": self._calculate_fee_apr(stable),
-                "incentive_apr": await self._estimate_incentive_apr(token_a, token_b),
+                "volume_24h": volume_24h,
+                "apr": total_apr,
+                "fee_apr": fee_apr,
+                "incentive_apr": emission_apr,
                 "reserves": {
                     token_a: pool_info.get("reserve0", Decimal("0")),
                     token_b: pool_info.get("reserve1", Decimal("0")),
@@ -146,20 +184,35 @@ class PoolScanner:
             logger.error(f"Error scanning pool {token_a}/{token_b}: {e}")
             return None
             
-    def _calculate_fee_apr(self, stable: bool) -> Decimal:
-        """Calculate fee APR based on pool type."""
-        # Stable pools: 0.01% fee, Volatile pools: 0.3% fee
-        # APR = (daily_volume * fee_rate * 365) / TVL
-        # This is a simplified calculation
-        if stable:
-            return Decimal("5.0")  # Typical for stable pools
-        else:
-            return Decimal("15.0")  # Typical for volatile pools
+    def _calculate_fee_apr(self, volume_24h: Decimal, tvl: Decimal, stable: bool) -> Decimal:
+        """Calculate fee APR based on actual volume and TVL."""
+        if tvl == 0:
+            return Decimal("0")
+            
+        # Fee rates: 0.01% for stable, 0.3% for volatile
+        fee_rate = Decimal("0.0001") if stable else Decimal("0.003")
+        
+        # Calculate daily fees
+        daily_fees = volume_24h * fee_rate
+        
+        # Annualize and convert to percentage
+        annual_fees = daily_fees * Decimal("365")
+        fee_apr = (annual_fees / tvl) * Decimal("100")
+        
+        logger.debug(f"Fee APR calculation: volume=${volume_24h:,.0f}, TVL=${tvl:,.0f}, fee_rate={fee_rate}, APR={fee_apr:.2f}%")
+        
+        return fee_apr
     
     async def _estimate_volume(self, pool_info: Dict, stable: bool) -> Decimal:
-        """Estimate 24h volume based on TVL and pool type."""
-        # In production, this would query historical events
-        # For now, estimate based on typical volume/TVL ratios
+        """Get real 24h volume from event monitor or estimate if not available."""
+        # Try to get real volume from event monitor
+        if self.event_monitor and pool_info.get("address"):
+            real_volume = self.event_monitor.get_24h_volume(pool_info["address"])
+            if real_volume > 0:
+                logger.debug(f"Using real volume for {pool_info['address']}: ${real_volume:,.0f}")
+                return real_volume
+        
+        # Fall back to estimation
         tvl = pool_info.get("tvl", Decimal("0"))
         if tvl == 0:
             return Decimal("0")
@@ -170,24 +223,49 @@ class PoolScanner:
         else:
             volume_ratio = Decimal("0.5")  # 50% daily volume
             
-        return tvl * volume_ratio
+        estimated_volume = tvl * volume_ratio
+        logger.debug(f"Estimated volume for {pool_info.get('address', 'unknown')}: ${estimated_volume:,.0f}")
+        return estimated_volume
     
-    async def _calculate_real_apr(self, pool_info: Dict, stable: bool) -> Decimal:
-        """Calculate real APR from pool data."""
+    async def _calculate_real_apr(self, pool_info: Dict, pool_address: str, stable: bool) -> Tuple[Decimal, Decimal, Decimal]:
+        """Calculate real APR from pool data and gauge emissions.
+        
+        Returns:
+            Tuple of (total_apr, fee_apr, emission_apr)
+        """
         tvl = pool_info.get("tvl", Decimal("0"))
         if tvl == 0:
-            return Decimal("0")
+            return Decimal("0"), Decimal("0"), Decimal("0")
             
-        # Fee APR calculation
-        fee_apr = self._calculate_fee_apr(stable)
+        # Calculate fee APR from actual volume
+        volume_24h = await self._estimate_volume(pool_info, stable)
+        fee_apr = self._calculate_fee_apr(volume_24h, tvl, stable)
         
-        # Add estimated incentive APR (would come from gauge contracts)
-        incentive_apr = await self._estimate_incentive_apr(
-            pool_info.get("token_a", ""),
-            pool_info.get("token_b", "")
+        # Get real emission APR from gauge
+        emission_apr = Decimal("0")
+        if self.gauge_reader and pool_address:
+            try:
+                emission_apr = await self.gauge_reader.calculate_emission_apr(
+                    pool_address,
+                    tvl,
+                    aero_price=Decimal("1.8")  # TODO: Get real AERO price
+                )
+            except Exception as e:
+                logger.error(f"Failed to get emission APR for {pool_address}: {e}")
+                # Fall back to estimate
+                emission_apr = await self._estimate_incentive_apr(
+                    pool_info.get("token_a", ""),
+                    pool_info.get("token_b", "")
+                )
+        
+        total_apr = fee_apr + emission_apr
+        
+        logger.info(
+            f"Pool {pool_address} APR breakdown: "
+            f"fee={fee_apr:.2f}%, emission={emission_apr:.2f}%, total={total_apr:.2f}%"
         )
         
-        return fee_apr + incentive_apr
+        return total_apr, fee_apr, emission_apr
     
     async def _estimate_incentive_apr(self, token_a: str, token_b: str) -> Decimal:
         """Estimate incentive APR from AERO emissions."""
