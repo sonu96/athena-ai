@@ -157,9 +157,9 @@ class RPCReader:
                 reserve0_hex = hex_data[0:64]
                 reserve1_hex = hex_data[64:128]
                 
-                # Convert to decimal
-                reserve0 = Decimal(int(reserve0_hex, 16)) / Decimal(10**18)
-                reserve1 = Decimal(int(reserve1_hex, 16)) / Decimal(10**18)
+                # Convert to decimal (return raw values, let caller handle decimals)
+                reserve0 = Decimal(int(reserve0_hex, 16))
+                reserve1 = Decimal(int(reserve1_hex, 16))
                 
                 return {
                     "reserve0": reserve0,

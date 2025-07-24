@@ -323,11 +323,22 @@ class BaseClient:
             decimals0 = decimals_map.get(token_info["token0"].lower(), 18)
             decimals1 = decimals_map.get(token_info["token1"].lower(), 18)
             
-            # Apply correct decimals if we got raw values from storage
-            if reserve0 > Decimal(10**30):  # Likely raw value
-                reserve0 = reserve0 / Decimal(10**decimals0)
-            if reserve1 > Decimal(10**30):  # Likely raw value  
-                reserve1 = reserve1 / Decimal(10**decimals1)
+            # Log raw reserves before decimal conversion
+            logger.debug(
+                f"Raw reserves for {pool_address}: "
+                f"reserve0={reserve0}, reserve1={reserve1}"
+            )
+            
+            # Apply correct decimals - reserves are always raw values now
+            reserve0 = reserve0 / Decimal(10**decimals0)
+            reserve1 = reserve1 / Decimal(10**decimals1)
+            
+            # Log after decimal conversion
+            logger.debug(
+                f"Adjusted reserves for {pool_address}: "
+                f"reserve0={reserve0} (decimals={decimals0}), "
+                f"reserve1={reserve1} (decimals={decimals1})"
+            )
             
             # Get token prices for accurate TVL calculation
             token_prices = await self._get_token_prices(token_a, token_b)
