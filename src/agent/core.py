@@ -11,6 +11,7 @@ from langgraph.graph import StateGraph, END
 import google.generativeai as genai
 
 from src.agent.memory import AthenaMemory, MemoryType
+from src.agent.pool_profiles import PoolProfiles
 from src.cdp.base_client import BaseClient
 from config.settings import settings, STRATEGIES, EMOTIONAL_STATES
 
