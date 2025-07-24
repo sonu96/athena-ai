@@ -22,15 +22,23 @@ class PoolScanner:
     profitable opportunities for liquidity provision and trading.
     """
     
-    def __init__(self, base_client: BaseClient, memory: AthenaMemory):
+    def __init__(self, base_client: BaseClient, memory: AthenaMemory, firestore_client=None):
         """Initialize pool scanner."""
         self.base_client = base_client
         self.memory = memory
+        self.firestore_client = firestore_client
+        self.pool_profiles = None
         self.scanning = False
         
         # Pool data cache
         self.pools = {}
         self.last_scan = None
+        
+        # Initialize pool profile manager if firestore is available
+        if self.firestore_client:
+            from src.agent.pool_profiles import PoolProfileManager
+            self.pool_profiles = PoolProfileManager(self.firestore_client)
+            logger.info("Pool scanner initialized with pool profile manager")
         
         # Top opportunities
         self.opportunities = {
@@ -139,6 +147,16 @@ class PoolScanner:
             self.pools[pool_key] = pool_data
             
             logger.debug(f"Scanned pool {pool_key}: address={pool_data.get('address')}, APR={pool_data.get('apr')}%, TVL=${pool_data.get('tvl'):,.0f}")
+            
+            # Update pool profile if available
+            if self.pool_profiles and pool_data.get("address"):
+                try:
+                    # Get current gas price
+                    gas_price = await self.base_client.get_gas_price()
+                    await self.pool_profiles.update_pool(pool_data, gas_price=gas_price)
+                    logger.info(f"Updated pool profile for {pool_key} at address {pool_data.get('address')}")
+                except Exception as e:
+                    logger.error(f"Failed to update pool profile for {pool_key}: {e}")
             
             return pool_data
             
