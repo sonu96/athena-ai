@@ -29,14 +29,13 @@ ENV PYTHONPATH=/app
 
 # Set environment variables
 ENV PYTHONUNBUFFERED=1
-ENV PORT=8000
 
-# Expose port
-EXPOSE 8000
+# Expose port (Cloud Run sets PORT env var)
+EXPOSE 8080
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
-  CMD python -c "import requests; requests.get('http://localhost:8000/health')"
+  CMD python -c "import requests; requests.get(f'http://localhost:{os.environ.get(\"PORT\", \"8080\")}/health')"
 
 # Run the application
-CMD ["python", "run.py"]
+CMD ["python", "run_fixed.py"]
