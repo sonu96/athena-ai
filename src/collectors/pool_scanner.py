@@ -243,35 +243,92 @@ class PoolScanner:
         return abs(ratio - Decimal("1")) > Decimal("0.1")
         
     async def _store_findings(self, opportunities: Dict):
-        """Store significant findings in memory."""
-        # Store high APR pools
+        """Store significant findings in memory - enhanced to capture all significant pools."""
+        from config.settings import settings
+        
+        # Get thresholds from settings or use defaults
+        min_apr_for_memory = getattr(settings, 'min_apr_for_memory', 20)
+        min_volume_for_memory = getattr(settings, 'min_volume_for_memory', 100000)
+        
+        # Store ALL high APR pools, not just the top one
         if opportunities["high_apr"]:
-            top_apr = max(opportunities["high_apr"], key=lambda x: x["apr"])
-            await self.memory.remember(
-                content=f"High APR pool found: {top_apr['pair']} at {top_apr['apr']}% APR",
-                memory_type=MemoryType.OBSERVATION,
-                category="pool_behavior",
-                metadata={
-                    "pool": top_apr["pair"],
-                    "apr": float(top_apr["apr"]),
-                    "tvl": float(top_apr["tvl"]),
-                },
-                confidence=0.9
-            )
+            for pool in opportunities["high_apr"]:
+                if pool["apr"] >= min_apr_for_memory:
+                    await self.memory.remember(
+                        content=f"High APR pool: {pool['pair']} at {pool['apr']}% APR (TVL: ${pool['tvl']:,.0f})",
+                        memory_type=MemoryType.OBSERVATION,
+                        category="pool_behavior",
+                        metadata={
+                            "pool": pool["pair"],
+                            "pool_address": pool.get("address"),
+                            "apr": float(pool["apr"]),
+                            "fee_apr": float(pool.get("fee_apr", 0)),
+                            "incentive_apr": float(pool.get("incentive_apr", 0)),
+                            "tvl": float(pool["tvl"]),
+                            "stable": pool.get("stable", False),
+                            "timestamp": pool.get("timestamp"),
+                        },
+                        confidence=0.9 if pool["apr"] > 50 else 0.7
+                    )
             
-        # Store volume leaders
+        # Store ALL high volume pools
         if opportunities["high_volume"]:
-            top_volume = max(opportunities["high_volume"], key=lambda x: x["volume_24h"])
-            await self.memory.remember(
-                content=f"High volume pool: {top_volume['pair']} with ${top_volume['volume_24h']:,.0f} daily volume",
-                memory_type=MemoryType.OBSERVATION,
-                category="pool_behavior",
-                metadata={
-                    "pool": top_volume["pair"],
-                    "volume": float(top_volume["volume_24h"]),
-                },
-                confidence=0.9
-            )
+            for pool in opportunities["high_volume"]:
+                if pool["volume_24h"] >= min_volume_for_memory:
+                    await self.memory.remember(
+                        content=f"High volume pool: {pool['pair']} with ${pool['volume_24h']:,.0f} daily volume (APR: {pool['apr']}%)",
+                        memory_type=MemoryType.OBSERVATION,
+                        category="pool_behavior",
+                        metadata={
+                            "pool": pool["pair"],
+                            "pool_address": pool.get("address"),
+                            "volume": float(pool["volume_24h"]),
+                            "apr": float(pool["apr"]),
+                            "tvl": float(pool["tvl"]),
+                            "volume_to_tvl_ratio": float(pool["volume_24h"] / pool["tvl"]) if pool["tvl"] > 0 else 0,
+                            "stable": pool.get("stable", False),
+                            "timestamp": pool.get("timestamp"),
+                        },
+                        confidence=0.9 if pool["volume_24h"] > 1000000 else 0.8
+                    )
+                    
+        # Store imbalanced pools for arbitrage tracking
+        if opportunities["imbalanced"]:
+            for pool in opportunities["imbalanced"]:
+                # Only store significantly imbalanced pools
+                if pool.get("ratio") and (pool["ratio"] > 2 or pool["ratio"] < 0.5):
+                    await self.memory.remember(
+                        content=f"Imbalanced pool detected: {pool['pair']} with ratio {pool['ratio']:.4f}",
+                        memory_type=MemoryType.OBSERVATION,
+                        category="arbitrage_opportunity",
+                        metadata={
+                            "pool": pool["pair"],
+                            "pool_address": pool.get("address"),
+                            "ratio": float(pool["ratio"]),
+                            "reserves": pool.get("reserves"),
+                            "tvl": float(pool["tvl"]),
+                            "timestamp": pool.get("timestamp"),
+                        },
+                        confidence=0.8
+                    )
+                    
+        # Store new pools if any
+        if opportunities.get("new_pools"):
+            for pool in opportunities["new_pools"]:
+                await self.memory.remember(
+                    content=f"New pool discovered: {pool['pair']} (TVL: ${pool['tvl']:,.0f}, APR: {pool['apr']}%)",
+                    memory_type=MemoryType.OBSERVATION,
+                    category="new_pool",
+                    metadata={
+                        "pool": pool["pair"],
+                        "pool_address": pool.get("address"),
+                        "apr": float(pool["apr"]),
+                        "tvl": float(pool["tvl"]),
+                        "stable": pool.get("stable", False),
+                        "timestamp": pool.get("timestamp"),
+                    },
+                    confidence=1.0
+                )
             
     def get_opportunities(self, category: Optional[str] = None) -> List[Dict]:
         """Get current opportunities."""
