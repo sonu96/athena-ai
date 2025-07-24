@@ -129,16 +129,24 @@ class AthenaMemory:
             
             if self.memory:
                 # Ensure all metadata values are JSON serializable
+                def convert_value(obj):
+                    """Recursively convert values for JSON serialization."""
+                    if isinstance(obj, datetime):
+                        return obj.isoformat()
+                    elif isinstance(obj, Decimal):
+                        return float(obj)
+                    elif isinstance(obj, dict):
+                        return {k: convert_value(v) for k, v in obj.items()}
+                    elif isinstance(obj, list):
+                        return [convert_value(item) for item in obj]
+                    elif hasattr(obj, '__dict__'):
+                        return str(obj)
+                    else:
+                        return obj
+                
                 safe_metadata = {}
                 for k, v in entry.metadata.items():
-                    if isinstance(v, datetime):
-                        safe_metadata[k] = v.isoformat()
-                    elif isinstance(v, Decimal):
-                        safe_metadata[k] = float(v)
-                    elif hasattr(v, '__dict__'):
-                        safe_metadata[k] = str(v)
-                    else:
-                        safe_metadata[k] = v
+                    safe_metadata[k] = convert_value(v)
                 
                 result = self.memory.add(
                     messages=messages,

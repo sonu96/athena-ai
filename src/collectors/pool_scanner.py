@@ -138,6 +138,8 @@ class PoolScanner:
             pool_key = f"{token_a}/{token_b}-{stable}"
             self.pools[pool_key] = pool_data
             
+            logger.debug(f"Scanned pool {pool_key}: address={pool_data.get('address')}, APR={pool_data.get('apr')}%, TVL=${pool_data.get('tvl'):,.0f}")
+            
             return pool_data
             
         except Exception as e:

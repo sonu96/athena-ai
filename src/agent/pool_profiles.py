@@ -4,6 +4,7 @@ Pool Profiles System for Athena AI
 Tracks individual pool behaviors and patterns over time to enable
 better decision making and pattern recognition.
 """
+import asyncio
 import logging
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Tuple
@@ -333,13 +334,16 @@ class PoolProfileManager:
     def __init__(self, firestore_client=None):
         self.profiles: Dict[str, PoolProfile] = {}
         self.firestore = firestore_client
+        logger.info(f"PoolProfileManager initialized with firestore_client: {firestore_client is not None}")
         
     async def update_pool(self, pool_data: Dict, gas_price: Optional[Decimal] = None):
         """Update or create pool profile with new data."""
         pool_address = pool_data.get("address", "")
         if not pool_address:
-            logger.warning("Pool data missing address")
+            logger.warning(f"Pool data missing address. Available keys: {list(pool_data.keys())}")
             return
+            
+        logger.debug(f"Updating pool profile for {pool_address} - pair: {pool_data.get('pair', 'unknown')}")
             
         # Create metrics from pool data
         metrics = PoolMetrics(
@@ -356,6 +360,7 @@ class PoolProfileManager:
         
         # Get or create profile
         if pool_address not in self.profiles:
+            logger.info(f"Creating new pool profile for {pool_address} - {pool_data.get('pair', '')}")
             self.profiles[pool_address] = PoolProfile(
                 pool_address=pool_address,
                 pair=pool_data.get("pair", ""),
@@ -374,9 +379,15 @@ class PoolProfileManager:
     async def _save_profile(self, profile: PoolProfile):
         """Save profile to Firestore."""
         try:
-            self.firestore.save_pool_profile(profile.pool_address, profile.to_dict())
+            # Run sync Firestore operation in thread pool to avoid blocking
+            await asyncio.to_thread(
+                self.firestore.save_pool_profile,
+                profile.pool_address,
+                profile.to_dict()
+            )
+            logger.info(f"Pool profile saved for {profile.pool_address}")
         except Exception as e:
-            logger.error(f"Failed to save pool profile: {e}")
+            logger.error(f"Failed to save pool profile for {profile.pool_address}: {e}")
             
     async def load_profiles(self):
         """Load profiles from Firestore."""
