@@ -43,7 +43,7 @@ async def start_agent():
     # Initialize components
     memory = AthenaMemory()
     base_client = BaseClient()
-    firestore = FirestoreClient()
+    firestore = FirestoreClient(project_id=settings.gcp_project_id)
     
     # Initialize CDP client
     await base_client.initialize()
