@@ -11,6 +11,7 @@ Athena is not just another trading bot - she's a learning AI agent with memory, 
 - **24/7 Autonomous Operation**: Never misses an opportunity
 - **Self-Learning**: Improves strategies based on outcomes
 - **Memory System**: Remembers patterns, successes, and failures
+- **Observation Mode**: Learns market patterns for 3 days before trading
 - **Multi-Strategy Execution**: Swaps, LP, staking, voting, arbitrage
 - **Real-time Monitoring**: FastAPI dashboard with live updates
 - **Production-Ready**: Deployed on Google Cloud with full observability
@@ -21,15 +22,15 @@ Athena is not just another trading bot - she's a learning AI agent with memory, 
 User Query → LangGraph Agent → Memory (Mem0) → Decision
                     ↓
             CDP Toolkit → Aerodrome → Profit
-                    ↓
-              Learning Loop
+                    ↓                    ↑
+              Learning Loop    Blockchain RPC Reader
 ```
 
 ### Tech Stack
 
 - **AI/ML**: LangGraph, Google Gemini 1.5 Flash
 - **Memory**: Mem0 (Pro) + Google Firestore
-- **Blockchain**: CDP SDK v1.24.0 for Base chain
+- **Blockchain**: CDP SDK v1.24.0 for Base chain + RPC Reader
 - **API**: FastAPI + WebSockets
 - **Observability**: LangSmith
 - **Infrastructure**: Google Cloud (Run, Firestore, Pub/Sub, Secret Manager)
@@ -201,6 +202,14 @@ Athena is fully compatible with Aerodrome V2 pools on Base. The agent:
 ## 🤝 Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for development guidelines.
+
+## 📚 Additional Documentation
+
+- [Architecture Deep Dive](ARCHITECTURE.md) - Detailed system design
+- [Database Architecture](DATABASE_ARCHITECTURE.md) - Memory and storage systems
+- [Project Summary](PROJECT_SUMMARY.md) - Quick overview
+- [API Documentation](API.md) - Endpoint reference
+- [Deployment Guide](DEPLOYMENT.md) - Production deployment
 
 ## 📄 License
 

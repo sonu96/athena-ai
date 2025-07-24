@@ -8,10 +8,12 @@ Athena is designed as a modular, event-driven system that operates autonomously 
 
 ### 1. Core Agent (LangGraph)
 
-The brain of Athena, implemented as a state machine with five primary states:
+The brain of Athena, implemented as a state machine with observation mode and five primary states:
 
 ```python
 StateMachine:
+  [Observation Mode: 3 days]
+        ↓
   OBSERVE → ANALYZE → DECIDE → EXECUTE → LEARN
      ↑                                      ↓
      └──────────────────────────────────────┘
@@ -22,28 +24,36 @@ StateMachine:
 - **OBSERVE**: Collects data from blockchain, monitors positions, tracks gas prices
 - **ANALYZE**: Processes observations with historical context, identifies patterns
 - **DECIDE**: Evaluates opportunities, calculates risk/reward, selects strategies
-- **EXECUTE**: Performs on-chain actions via CDP SDK
+- **EXECUTE**: Performs on-chain actions via CDP SDK (disabled during observation)
 - **LEARN**: Updates memory with outcomes, refines strategies
+
+**Observation Mode:**
+- First 3 days: Pattern learning without trading
+- Builds confidence in market patterns
+- Transitions to full trading after observation period
 
 ### 2. Memory System (Mem0)
 
-Hierarchical memory architecture with three levels:
+Memory architecture using Mem0 with Firestore persistence:
 
 ```
-Short-term Memory (Redis)
-├── Current market state
-├── Recent transactions
-└── Active positions
+Mem0 Cloud API (Primary)
+├── Vector-based semantic search
+├── Memory categorization
+└── Confidence scoring
+    ↓ (fallback)
+Local Memory Storage
+├── In-memory list storage
+└── Simple text matching
 
-Long-term Memory (Firestore)
-├── Historical patterns
-├── Strategy performance
-└── Learned behaviors
-
-Semantic Memory (Vector DB)
-├── Market relationships
-├── Protocol knowledge
-└── Trading strategies
+Firestore Collections
+├── agent_state/       # Current operational state
+├── cycles/            # Reasoning cycle history
+├── positions/         # Active trading positions
+├── performance/       # Aggregated metrics
+├── observed_patterns/ # Discovered patterns
+├── pattern_confidence/# Pattern success tracking
+└── observation_metrics/ # Learning phase metrics
 ```
 
 **Memory Operations:**
@@ -67,12 +77,12 @@ context = memory.search(
 
 ### 3. CDP Integration Layer
 
-Handles all blockchain interactions through CDP SDK:
+Handles all blockchain interactions through CDP SDK v1.24.0:
 
 ```python
 CDPClient
 ├── Wallet Management
-│   ├── create_wallet()
+│   ├── create_wallet()     # Ed25519 support
 │   ├── get_balance()
 │   └── estimate_gas()
 ├── Aerodrome Operations  
@@ -81,10 +91,14 @@ CDPClient
 │   ├── stake_in_gauge()
 │   ├── vote_for_pools()
 │   └── claim_rewards()
+├── Blockchain RPC Reader   # NEW
+│   ├── read_pool_reserves() # Direct storage reading
+│   ├── get_pool_data()     # Aerodrome V2 support
+│   └── fallback_reading()  # Storage slot access
 └── Monitoring
     ├── watch_position()
     ├── track_tx_status()
-    └── get_pool_data()
+    └── get_pool_info()
 ```
 
 ### 4. Data Collection Pipeline
@@ -209,7 +223,7 @@ Result + Context → Pattern Extraction → Memory.update() → Strategy Refinem
 ```
 Google Secret Manager
 ├── CDP API Keys (rotated monthly)
-├── OpenAI Keys (monitored for usage)
+├── Google AI Keys (Gemini 1.5 Flash)
 └── RPC Endpoints (multiple for redundancy)
 ```
 
@@ -306,6 +320,12 @@ Code Push → Cloud Build → Run Tests → Deploy Staging → Validate → Depl
 - Decentralized deployment
 - DAO governance integration
 - Custom strategy marketplace
+
+## Related Documentation
+
+- [Database Architecture](DATABASE_ARCHITECTURE.md) - Detailed memory and storage design
+- [API Documentation](API.md) - Complete endpoint reference
+- [Deployment Guide](DEPLOYMENT.md) - Production deployment procedures
 
 ---
 

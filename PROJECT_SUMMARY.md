@@ -10,6 +10,7 @@ Athena AI is a 24/7 autonomous DeFi agent that operates on the Base blockchain, 
 
 1. **LangGraph Agent (Brain)**
    - State machine with OBSERVE → ANALYZE → DECIDE → EXECUTE → LEARN cycle
+   - Observation mode: 3-day pattern learning before trading
    - Emotional modeling for decision confidence
    - Continuous reasoning every 5 minutes
 
@@ -20,9 +21,11 @@ Athena AI is a 24/7 autonomous DeFi agent that operates on the Base blockchain, 
    - Performance tracking and strategy optimization
 
 3. **CDP Integration**
+   - CDP SDK v1.24.0 with Ed25519 support
    - Secure wallet management (no private keys)
    - Native Base blockchain interactions
    - Aerodrome protocol operations (swaps, LP, staking, voting)
+   - Blockchain RPC reader for direct data access
 
 4. **Data Collectors**
    - Gas Monitor: Tracks gas prices, finds optimal execution windows
@@ -37,6 +40,7 @@ Athena AI is a 24/7 autonomous DeFi agent that operates on the Base blockchain, 
 ## 💡 Key Features
 
 ### Learning Capabilities
+- **Observation Mode**: Learns for 3 days before trading
 - Discovers patterns in gas prices
 - Identifies profitable pool opportunities
 - Learns from successful/failed trades
@@ -90,6 +94,12 @@ Key endpoints:
 
 ## 🧠 How Athena Thinks
 
+**Observation Phase (First 3 Days):**
+- Collects market data without trading
+- Discovers patterns and builds confidence
+- Learns optimal timing and market behaviors
+
+**Active Trading Phase:**
 1. **Observes**: Collects market data, gas prices, pool states
 2. **Remembers**: Retrieves relevant past experiences
 3. **Analyzes**: Processes data with historical context
@@ -110,9 +120,9 @@ Athena tracks:
 
 ## 🔧 Technology Stack
 
-- **AI/ML**: LangGraph, LangChain, OpenAI GPT-4
-- **Memory**: Mem0 with Qdrant vector database
-- **Blockchain**: CDP SDK for Base chain
+- **AI/ML**: LangGraph, LangChain, Google Gemini 1.5 Flash
+- **Memory**: Mem0 (cloud API or local fallback) + Google Firestore
+- **Blockchain**: CDP SDK v1.24.0 for Base chain + RPC Reader
 - **Backend**: FastAPI with WebSockets
 - **Monitoring**: LangSmith for observability
 - **Infrastructure**: Docker, Google Cloud Platform
@@ -182,6 +192,7 @@ To extend Athena:
 
 - [README.md](README.md) - Detailed documentation
 - [ARCHITECTURE.md](ARCHITECTURE.md) - System design
+- [DATABASE_ARCHITECTURE.md](DATABASE_ARCHITECTURE.md) - Memory and storage design
 - [API.md](API.md) - API documentation
 - [DEPLOYMENT.md](DEPLOYMENT.md) - Deployment guide
 
