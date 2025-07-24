@@ -215,33 +215,33 @@ CONTRACTS = {
             {
                 "name": "Swap",
                 "type": "event",
-                "anonymous": false,
+                "anonymous": False,
                 "inputs": [
-                    {"indexed": true, "name": "sender", "type": "address"},
-                    {"indexed": false, "name": "amount0In", "type": "uint256"},
-                    {"indexed": false, "name": "amount1In", "type": "uint256"},
-                    {"indexed": false, "name": "amount0Out", "type": "uint256"},
-                    {"indexed": false, "name": "amount1Out", "type": "uint256"},
-                    {"indexed": true, "name": "to", "type": "address"}
+                    {"indexed": True, "name": "sender", "type": "address"},
+                    {"indexed": False, "name": "amount0In", "type": "uint256"},
+                    {"indexed": False, "name": "amount1In", "type": "uint256"},
+                    {"indexed": False, "name": "amount0Out", "type": "uint256"},
+                    {"indexed": False, "name": "amount1Out", "type": "uint256"},
+                    {"indexed": True, "name": "to", "type": "address"}
                 ]
             },
             {
                 "name": "Sync",
                 "type": "event",
-                "anonymous": false,
+                "anonymous": False,
                 "inputs": [
-                    {"indexed": false, "name": "reserve0", "type": "uint256"},
-                    {"indexed": false, "name": "reserve1", "type": "uint256"}
+                    {"indexed": False, "name": "reserve0", "type": "uint256"},
+                    {"indexed": False, "name": "reserve1", "type": "uint256"}
                 ]
             },
             {
                 "name": "Fees",
                 "type": "event",
-                "anonymous": false,
+                "anonymous": False,
                 "inputs": [
-                    {"indexed": true, "name": "sender", "type": "address"},
-                    {"indexed": false, "name": "amount0", "type": "uint256"},
-                    {"indexed": false, "name": "amount1", "type": "uint256"}
+                    {"indexed": True, "name": "sender", "type": "address"},
+                    {"indexed": False, "name": "amount0", "type": "uint256"},
+                    {"indexed": False, "name": "amount1", "type": "uint256"}
                 ]
             }
         ]
