@@ -154,6 +154,12 @@ class Settings(BaseSettings):
     observation_start_time: Optional[str] = Field(None, env="OBSERVATION_START_TIME")  # ISO format
     min_pattern_confidence: float = Field(default=0.7, env="MIN_PATTERN_CONFIDENCE")  # Min confidence to act on patterns
     
+    # Enhanced Memory System Configuration
+    min_apr_for_memory: int = Field(default=20, env="MIN_APR_FOR_MEMORY")  # Store pools with APR >= 20%
+    min_volume_for_memory: int = Field(default=100000, env="MIN_VOLUME_FOR_MEMORY")  # Store pools with volume >= $100k
+    max_memories_per_cycle: int = Field(default=50, env="MAX_MEMORIES_PER_CYCLE")  # Prevent memory overflow
+    pool_profile_update_interval: int = Field(default=3600, env="POOL_PROFILE_UPDATE_INTERVAL")  # Update profiles every hour
+    
     # API Configuration
     api_port: int = Field(default=8000, env="API_PORT")
     api_host: str = Field(default="0.0.0.0", env="API_HOST")

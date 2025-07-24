@@ -2,7 +2,7 @@
 Firestore client for persistent storage
 """
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Any
 from google.cloud import firestore
 from google.cloud.firestore_v1.base_query import FieldFilter
@@ -192,4 +192,106 @@ class FirestoreClient:
             return patterns
         except Exception as e:
             logger.error(f"Failed to get high confidence patterns: {e}")
+            return []
+            
+    def save_pool_profile(self, pool_address: str, profile_data: Dict[str, Any]) -> None:
+        """Save or update a pool profile."""
+        try:
+            clean_data = self._clean_for_firestore(profile_data)
+            clean_data['updated_at'] = datetime.utcnow()
+            
+            self.db.collection('pool_profiles').document(pool_address).set(clean_data)
+            logger.info(f"Pool profile saved for {pool_address}")
+        except Exception as e:
+            logger.error(f"Failed to save pool profile: {e}")
+            
+    def get_pool_profile(self, pool_address: str) -> Optional[Dict[str, Any]]:
+        """Get a specific pool profile."""
+        try:
+            doc = self.db.collection('pool_profiles').document(pool_address).get()
+            if doc.exists:
+                return doc.to_dict()
+            return None
+        except Exception as e:
+            logger.error(f"Failed to get pool profile: {e}")
+            return None
+            
+    def get_all_pool_profiles(self) -> Dict[str, Dict[str, Any]]:
+        """Get all pool profiles."""
+        try:
+            profiles = {}
+            docs = self.db.collection('pool_profiles').stream()
+            for doc in docs:
+                profiles[doc.id] = doc.to_dict()
+            return profiles
+        except Exception as e:
+            logger.error(f"Failed to get all pool profiles: {e}")
+            return {}
+            
+    def save_pool_metrics(self, pool_address: str, metrics: Dict[str, Any]) -> str:
+        """Save pool metrics time-series data."""
+        try:
+            clean_metrics = self._clean_for_firestore(metrics)
+            clean_metrics['pool_address'] = pool_address
+            clean_metrics['timestamp'] = datetime.utcnow()
+            
+            # Store in pool_metrics collection with auto-generated ID
+            doc_ref = self.db.collection('pool_metrics').add(clean_metrics)[1]
+            logger.info(f"Pool metrics saved for {pool_address} with ID: {doc_ref.id}")
+            return doc_ref.id
+        except Exception as e:
+            logger.error(f"Failed to save pool metrics: {e}")
+            return ""
+            
+    def get_pool_metrics(self, pool_address: str, hours: int = 24) -> List[Dict[str, Any]]:
+        """Get pool metrics for the last N hours."""
+        try:
+            cutoff_time = datetime.utcnow() - timedelta(hours=hours)
+            
+            docs = (self.db.collection('pool_metrics')
+                   .where('pool_address', '==', pool_address)
+                   .where('timestamp', '>=', cutoff_time)
+                   .order_by('timestamp', direction=firestore.Query.DESCENDING)
+                   .stream())
+                   
+            metrics = []
+            for doc in docs:
+                metric_data = doc.to_dict()
+                metric_data['id'] = doc.id
+                metrics.append(metric_data)
+                
+            return metrics
+        except Exception as e:
+            logger.error(f"Failed to get pool metrics: {e}")
+            return []
+            
+    def save_pattern_correlation(self, correlation_data: Dict[str, Any]) -> str:
+        """Save cross-pool pattern correlation."""
+        try:
+            clean_data = self._clean_for_firestore(correlation_data)
+            clean_data['discovered_at'] = datetime.utcnow()
+            
+            doc_ref = self.db.collection('pattern_correlations').add(clean_data)[1]
+            logger.info(f"Pattern correlation saved with ID: {doc_ref.id}")
+            return doc_ref.id
+        except Exception as e:
+            logger.error(f"Failed to save pattern correlation: {e}")
+            return ""
+            
+    def get_pattern_correlations(self, min_strength: float = 0.5) -> List[Dict[str, Any]]:
+        """Get pattern correlations above minimum strength."""
+        try:
+            docs = (self.db.collection('pattern_correlations')
+                   .where('correlation_strength', '>=', min_strength)
+                   .stream())
+                   
+            correlations = []
+            for doc in docs:
+                corr_data = doc.to_dict()
+                corr_data['id'] = doc.id
+                correlations.append(corr_data)
+                
+            return correlations
+        except Exception as e:
+            logger.error(f"Failed to get pattern correlations: {e}")
             return []

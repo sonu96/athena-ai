@@ -259,6 +259,46 @@ export MIN_PATTERN_CONFIDENCE=0.7
 - Google AI API key uses Gemini 1.5 Flash model
 - Mem0 Pro plan required for graph memories feature
 
+### Enhanced Memory System (v2.0)
+The memory system has been significantly enhanced to store comprehensive pool data:
+
+#### Key Improvements
+1. **Comprehensive Storage**: Stores 10-15 memories per scan (vs 2 in v1.0)
+   - All pools with APR >= 20%
+   - All pools with volume >= $100k
+   - All significantly imbalanced pools
+
+2. **Pool Profiles**: Individual behavior tracking per pool
+   - Historical ranges (APR, TVL, volume)
+   - Time patterns (hourly, daily)
+   - Predictive capabilities
+
+3. **New Firestore Collections**:
+   - `pool_profiles`: Individual pool behaviors
+   - `pool_metrics`: Time-series pool data
+   - `pattern_correlations`: Cross-pool relationships
+
+#### Configuration
+```bash
+# Memory system thresholds
+export MIN_APR_FOR_MEMORY=20          # Store pools with APR >= 20%
+export MIN_VOLUME_FOR_MEMORY=100000   # Store pools with volume >= $100k
+export MAX_MEMORIES_PER_CYCLE=50      # Prevent memory overflow
+export POOL_PROFILE_UPDATE_INTERVAL=3600  # Update profiles every hour
+```
+
+#### Usage
+```python
+# Pool-specific memory queries
+memories = await memory.recall_pool_memories("WETH/USDC", hours=24)
+
+# Get pool predictions
+predictions = pool_profiles.predict_opportunities(next_hour)
+
+# Find cross-pool correlations
+correlations = await memory.get_cross_pool_correlations()
+```
+
 ### Known Issues
 - Some Aerodrome V2 pools don't implement standard Uniswap V2 interface
 - getReserves() may revert - system automatically falls back to storage reading

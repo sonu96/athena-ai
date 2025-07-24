@@ -41,6 +41,10 @@ class AthenaAgent:
         self.memory = memory
         self.base_client = base_client
         self.firestore = firestore_client
+        
+        # Initialize pool profile manager
+        from src.agent.pool_profiles import PoolProfileManager
+        self.pool_profiles = PoolProfileManager(firestore_client)
         # Initialize Gemini directly without LangChain
         if settings.google_api_key:
             genai.configure(api_key=settings.google_api_key)
@@ -164,6 +168,20 @@ class AthenaAgent:
                     category="market_pattern",
                     metadata=obs
                 )
+                
+            # Update pool profiles with observed data
+            if gas_price:
+                current_gas = Decimal(str(gas_price))
+            else:
+                current_gas = None
+                
+            for obs in observations:
+                if obs["type"] == "pools" and obs["data"]:
+                    pool_data = obs["data"]
+                    # Add timestamp if not present
+                    if "timestamp" not in pool_data:
+                        pool_data["timestamp"] = obs["timestamp"]
+                    await self.pool_profiles.update_pool(pool_data, gas_price=current_gas)
                 
         except Exception as e:
             logger.error(f"Observation error: {e}")
@@ -375,6 +393,28 @@ class AthenaAgent:
                                 "pattern_id": pattern["id"]
                             })
                             logger.info(f"📍 Pattern match: {pattern['type']} - {pattern['description'][:50]}...")
+        
+        # Use pool profile predictions for better decisions
+        if self.pool_profiles:
+            # Get predictions for the next hour
+            predictions = self.pool_profiles.predict_opportunities(
+                datetime.utcnow() + timedelta(hours=1)
+            )
+            
+            for prediction in predictions[:3]:  # Top 3 predictions
+                if prediction["confidence"] == "high" and prediction["predicted_apr"] > 50:
+                    decisions.append({
+                        "strategy": "pool_opportunity",
+                        "action": "monitor",
+                        "confidence": prediction["profile_confidence"],
+                        "parameters": {
+                            "pool": prediction["pool"],
+                            "predicted_apr": prediction["predicted_apr"],
+                            "predicted_volume": prediction["predicted_volume"]
+                        },
+                        "profile_based": True
+                    })
+                    logger.info(f"🔮 Pool prediction: {prediction['pool']} - APR {prediction['predicted_apr']}%")
         
         # Regular strategy evaluation
         for strategy_name, strategy_config in STRATEGIES.items():

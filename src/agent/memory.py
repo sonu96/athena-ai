@@ -430,6 +430,168 @@ class AthenaMemory:
             logger.error(f"Failed to get strategy performance: {e}")
             return {}
             
+    async def recall_pool_memories(
+        self, 
+        pool_pair: str,
+        memory_type: Optional[MemoryType] = None,
+        time_window_hours: Optional[int] = None,
+        limit: int = 50
+    ) -> List[Dict]:
+        """
+        Recall memories specific to a pool.
+        
+        Args:
+            pool_pair: Pool pair identifier (e.g., "WETH/USDC")
+            memory_type: Filter by memory type
+            time_window_hours: Only get memories from last N hours
+            limit: Maximum memories to return
+            
+        Returns:
+            List of pool-specific memories
+        """
+        # Build query that includes pool pair
+        query = f"pool {pool_pair}"
+        
+        # Get memories
+        memories = await self.recall(
+            query=query,
+            memory_type=memory_type,
+            limit=limit * 2  # Get extra to filter
+        )
+        
+        # Filter by pool metadata
+        pool_memories = []
+        for mem in memories:
+            metadata = mem.get("metadata", {})
+            if metadata.get("pool") == pool_pair:
+                # Check time window if specified
+                if time_window_hours:
+                    try:
+                        timestamp = datetime.fromisoformat(metadata.get("timestamp", ""))
+                        if (datetime.utcnow() - timestamp).total_seconds() / 3600 > time_window_hours:
+                            continue
+                    except:
+                        pass
+                        
+                pool_memories.append(mem)
+                
+        return pool_memories[:limit]
+        
+    async def get_pool_patterns(self, pool_pair: Optional[str] = None) -> List[Dict]:
+        """
+        Get discovered patterns for a specific pool or all pools.
+        
+        Args:
+            pool_pair: Optional pool pair to filter by
+            
+        Returns:
+            List of pattern memories
+        """
+        query = f"pool {pool_pair} pattern" if pool_pair else "pattern"
+        
+        patterns = await self.recall(
+            query=query,
+            memory_type=MemoryType.PATTERN,
+            limit=100
+        )
+        
+        # If pool specified, filter to exact matches
+        if pool_pair:
+            patterns = [
+                p for p in patterns 
+                if p.get("metadata", {}).get("pool") == pool_pair
+            ]
+            
+        return patterns
+        
+    async def get_cross_pool_correlations(self) -> List[Dict]:
+        """
+        Get memories about correlations between different pools.
+        
+        Returns:
+            List of correlation memories
+        """
+        # Search for correlation patterns
+        correlations = await self.recall(
+            query="correlation between pools",
+            memory_type=MemoryType.PATTERN,
+            category="cross_pool_correlation",
+            limit=50
+        )
+        
+        return correlations
+        
+    async def remember_pool_correlation(
+        self,
+        pool_a: str,
+        pool_b: str,
+        correlation_type: str,
+        correlation_strength: float,
+        metadata: Optional[Dict] = None
+    ):
+        """
+        Remember a correlation between two pools.
+        
+        Args:
+            pool_a: First pool pair
+            pool_b: Second pool pair
+            correlation_type: Type of correlation (e.g., "volume", "apr", "liquidity")
+            correlation_strength: Strength of correlation (-1 to 1)
+            metadata: Additional metadata
+        """
+        content = f"Correlation discovered between {pool_a} and {pool_b}: {correlation_type} correlation of {correlation_strength:.2f}"
+        
+        await self.remember(
+            content=content,
+            memory_type=MemoryType.PATTERN,
+            category="cross_pool_correlation",
+            metadata={
+                "pool_a": pool_a,
+                "pool_b": pool_b,
+                "correlation_type": correlation_type,
+                "correlation_strength": correlation_strength,
+                "pools": [pool_a, pool_b],
+                **(metadata or {})
+            },
+            confidence=abs(correlation_strength)
+        )
+        
+    async def get_pool_timeline(self, pool_pair: str, hours: int = 24) -> List[Dict]:
+        """
+        Get chronological timeline of memories for a pool.
+        
+        Args:
+            pool_pair: Pool pair identifier
+            hours: How many hours back to look
+            
+        Returns:
+            List of memories sorted by timestamp
+        """
+        memories = await self.recall_pool_memories(
+            pool_pair=pool_pair,
+            time_window_hours=hours,
+            limit=200
+        )
+        
+        # Sort by timestamp
+        for mem in memories:
+            try:
+                timestamp_str = mem.get("metadata", {}).get("timestamp", "")
+                if timestamp_str:
+                    mem["_timestamp"] = datetime.fromisoformat(timestamp_str)
+                else:
+                    mem["_timestamp"] = datetime.min
+            except:
+                mem["_timestamp"] = datetime.min
+                
+        memories.sort(key=lambda x: x["_timestamp"])
+        
+        # Remove temporary timestamp
+        for mem in memories:
+            mem.pop("_timestamp", None)
+            
+        return memories
+        
     async def forget_old_memories(self, days: int = 30) -> int:
         """Remove memories older than specified days."""
         # TODO: Implement memory cleanup

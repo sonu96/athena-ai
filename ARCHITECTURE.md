@@ -32,48 +32,80 @@ StateMachine:
 - Builds confidence in market patterns
 - Transitions to full trading after observation period
 
-### 2. Memory System (Mem0)
+### 2. Enhanced Memory System (v2.0)
 
-Memory architecture using Mem0 with Firestore persistence:
+Comprehensive memory architecture with tiered storage and pool profiling:
 
 ```
+Tiered Memory Architecture
+├── L1: Raw Observations (All significant pools)
+│   ├── APR >= 20% pools
+│   ├── Volume >= $100k pools
+│   └── Imbalanced pools (ratio deviation > 100%)
+├── L2: Pool Profiles (Individual behavior tracking)
+│   ├── Historical ranges (APR, TVL, volume)
+│   ├── Time patterns (hourly, daily)
+│   └── Behavioral metrics (volatility, correlations)
+└── L3: Pattern Correlations (Cross-pool insights)
+    ├── Inter-pool relationships
+    ├── Gas price correlations
+    └── Predictive patterns
+
 Mem0 Cloud API (Primary)
 ├── Vector-based semantic search
-├── Memory categorization
+├── Pool-specific queries
+├── Cross-pool correlations
 └── Confidence scoring
-    ↓ (fallback)
-Local Memory Storage
-├── In-memory list storage
-└── Simple text matching
-
+    ↓ (persistence)
 Firestore Collections
-├── agent_state/       # Current operational state
-├── cycles/            # Reasoning cycle history
-├── positions/         # Active trading positions
-├── performance/       # Aggregated metrics
-├── observed_patterns/ # Discovered patterns
-├── pattern_confidence/# Pattern success tracking
-└── observation_metrics/ # Learning phase metrics
+├── agent_state/         # Current operational state
+├── cycles/              # Reasoning cycle history
+├── positions/           # Active trading positions
+├── performance/         # Aggregated metrics
+├── observed_patterns/   # Discovered patterns
+├── pattern_confidence/  # Pattern success tracking
+├── observation_metrics/ # Learning phase metrics
+├── pool_profiles/       # Individual pool behaviors (NEW)
+├── pool_metrics/        # Time-series pool data (NEW)
+└── pattern_correlations/# Cross-pool patterns (NEW)
 ```
 
-**Memory Operations:**
+**Enhanced Memory Operations:**
 
 ```python
-# Store observation
-memory.add(
-    category="market_pattern",
-    content="Gas drops 40% at 3 AM UTC",
-    confidence=0.87,
-    observations=150
+# Store ALL significant pools (not just top performers)
+for pool in scanned_pools:
+    if pool["apr"] >= 20 or pool["volume"] >= 100000:
+        memory.add(
+            category="pool_behavior",
+            content=f"Pool {pool['pair']}: APR {pool['apr']}%",
+            metadata={
+                "pool_address": pool["address"],
+                "apr": pool["apr"],
+                "tvl": pool["tvl"],
+                "timestamp": pool["timestamp"]
+            }
+        )
+
+# Pool-specific queries
+pool_memories = await memory.recall_pool_memories(
+    pool_pair="WETH/USDC",
+    time_window_hours=24
 )
 
-# Retrieve relevant memories
-context = memory.search(
-    query="optimal gas timing",
-    categories=["market_pattern", "execution_strategy"],
-    limit=5
+# Cross-pool correlations
+correlations = await memory.get_cross_pool_correlations()
+
+# Pool profile predictions
+predictions = pool_profiles.predict_opportunities(
+    timestamp=datetime.utcnow() + timedelta(hours=1)
 )
 ```
+
+**Memory Storage Improvements:**
+- **v1.0**: 2 memories per scan (top APR, top volume)
+- **v2.0**: 10-15 memories per scan (all significant activity)
+- **Result**: 5-7x more data for pattern recognition
 
 ### 3. CDP Integration Layer
 

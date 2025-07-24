@@ -126,6 +126,50 @@ MemoryEntry = {
   - `confidence_levels`: Pattern confidence map
   - `last_update`: Update timestamp
 
+#### `pool_profiles` (NEW - v2.0)
+- Documents: Pool address as document ID
+- Purpose: Individual pool behavior profiles
+- Fields:
+  - `pool_address`: Pool contract address
+  - `pair`: Token pair (e.g., "WETH/USDC")
+  - `stable`: Whether it's a stable pool
+  - `apr_range`: [min, max] APR observed
+  - `tvl_range`: [min, max] TVL observed
+  - `volume_range`: [min, max] volume observed
+  - `hourly_patterns`: Hour → average metrics
+  - `daily_patterns`: Day → average metrics
+  - `typical_volume_to_tvl`: Average ratio
+  - `volatility_score`: APR volatility measure
+  - `correlation_with_gas`: Gas price correlation
+  - `observations_count`: Total observations
+  - `confidence_score`: Profile reliability score
+  - `last_updated`: Last update timestamp
+
+#### `pool_metrics` (NEW - v2.0)
+- Purpose: Time-series pool data
+- Fields:
+  - `pool_address`: Pool contract address
+  - `timestamp`: Observation time
+  - `apr`: Current APR
+  - `tvl`: Total value locked
+  - `volume_24h`: 24-hour volume
+  - `fee_apr`: Fee component of APR
+  - `incentive_apr`: Incentive component
+  - `reserves`: Token reserves
+  - `ratio`: Reserve ratio
+  - `gas_price`: Gas price at observation
+
+#### `pattern_correlations` (NEW - v2.0)
+- Purpose: Cross-pool pattern relationships
+- Fields:
+  - `pool_a`: First pool pair
+  - `pool_b`: Second pool pair
+  - `correlation_type`: Type (volume, apr, liquidity)
+  - `correlation_strength`: -1 to 1 correlation value
+  - `discovered_at`: Discovery timestamp
+  - `occurrences`: Number of observations
+  - `confidence`: Correlation confidence
+
 ### 3. In-Memory Caches
 
 **Gas Monitor Cache** (`src/collectors/gas_monitor.py`):
