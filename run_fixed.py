@@ -122,13 +122,13 @@ if __name__ == "__main__":
         print("=" * 60)
         print("ATHENA AI - 24/7 DeFi Agent")
         print("=" * 60)
-        print(f"🌐 Starting API server on http://{settings.api_host}:{settings.api_port}")
-        print(f"📚 API docs available at http://{settings.api_host}:{settings.api_port}/docs")
-        
-        # Run uvicorn directly as the main process
-        # Use PORT env var from Cloud Run, fallback to settings
         import os
         port = int(os.environ.get('PORT', settings.api_port))
+        print(f"🌐 Starting API server on http://{settings.api_host}:{port}")
+        print(f"📚 API docs available at http://{settings.api_host}:{port}/docs")
+        
+        # Run uvicorn directly as the main process
+        # Port is already set above
         uvicorn.run(
             "run_fixed:app",
             host=settings.api_host,
