@@ -134,8 +134,8 @@ class PoolScanner:
                 "fee_apr": self._calculate_fee_apr(stable),
                 "incentive_apr": await self._estimate_incentive_apr(token_a, token_b),
                 "reserves": {
-                    token_a: pool_info.get("reserve0", Decimal("0")),
-                    token_b: pool_info.get("reserve1", Decimal("0")),
+                    token_a: pool_info.get("reserve_a", pool_info.get("reserve0", Decimal("0"))),
+                    token_b: pool_info.get("reserve_b", pool_info.get("reserve1", Decimal("0"))),
                 },
                 "ratio": pool_info.get("ratio", Decimal("1")),
                 "imbalanced": pool_info.get("imbalanced", False),
@@ -302,7 +302,7 @@ class PoolScanner:
                             "incentive_apr": float(pool.get("incentive_apr", 0)),
                             "tvl": float(pool["tvl"]),
                             "stable": pool.get("stable", False),
-                            "timestamp": pool.get("timestamp"),
+                            "timestamp": pool.get("timestamp").isoformat() if isinstance(pool.get("timestamp"), datetime) else pool.get("timestamp"),
                         },
                         confidence=0.9 if pool["apr"] > 50 else 0.7
                     )

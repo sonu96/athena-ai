@@ -332,26 +332,49 @@ class BaseClient:
             # Get token prices for accurate TVL calculation
             token_prices = await self._get_token_prices(token_a, token_b)
             
-            # Calculate TVL with actual prices
-            tvl = (reserve0 * token_prices[token_a]) + (reserve1 * token_prices[token_b])
+            # Map reserves to the correct tokens first (before TVL calculation)
+            # In Uniswap V2 pools, tokens are sorted by address
+            token0_address = token_info["token0"].lower()
+            token1_address = token_info["token1"].lower()
+            
+            # Map the reserves to the requested tokens
+            if token_a_address.lower() == token0_address:
+                reserve_a = reserve0
+                reserve_b = reserve1
+            else:
+                # token_a is token1, so swap the reserves
+                reserve_a = reserve1
+                reserve_b = reserve0
+            
+            # Calculate TVL with actual prices using correctly mapped reserves
+            tvl = (reserve_a * token_prices[token_a]) + (reserve_b * token_prices[token_b])
             
             # Log TVL calculation for validation
             logger.info(
                 f"TVL Calculation for {token_a}/{token_b}: "
-                f"{reserve0:.4f} {token_a} @ ${token_prices[token_a]:.2f} + "
-                f"{reserve1:.4f} {token_b} @ ${token_prices[token_b]:.2f} = ${tvl:.2f}"
+                f"{reserve_a:.4f} {token_a} @ ${token_prices[token_a]:.2f} + "
+                f"{reserve_b:.4f} {token_b} @ ${token_prices[token_b]:.2f} = ${tvl:.2f}"
             )
             
-            # Calculate pool token ratio
-            ratio = reserve0 / reserve1 if reserve1 > 0 else Decimal(0)
+            # Calculate pool token ratio using the correctly mapped reserves
+            ratio = reserve_a / reserve_b if reserve_b > 0 else Decimal(0)
+            
+            # Log the correct mapping for debugging
+            logger.info(
+                f"Token mapping for {pool_address}: "
+                f"token0={token0_address} (reserve={reserve0:.4f}), "
+                f"token1={token1_address} (reserve={reserve1:.4f})"
+            )
             
             return {
                 "address": pool_address,
                 "token_a": token_a,
                 "token_b": token_b,
                 "stable": stable,
-                "reserve0": reserve0,
-                "reserve1": reserve1,
+                "reserve0": reserve0,  # Keep original for reference
+                "reserve1": reserve1,  # Keep original for reference
+                "reserve_a": reserve_a,  # Correctly mapped reserve for token_a
+                "reserve_b": reserve_b,  # Correctly mapped reserve for token_b
                 "total_supply": total_supply_decimal,
                 "tvl": tvl,
                 "ratio": ratio,

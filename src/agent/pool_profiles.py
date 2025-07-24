@@ -346,8 +346,14 @@ class PoolProfileManager:
         logger.debug(f"Updating pool profile for {pool_address} - pair: {pool_data.get('pair', 'unknown')}")
             
         # Create metrics from pool data
+        timestamp = pool_data.get("timestamp")
+        if isinstance(timestamp, str):
+            timestamp = datetime.fromisoformat(timestamp)
+        elif not isinstance(timestamp, datetime):
+            timestamp = datetime.utcnow()
+            
         metrics = PoolMetrics(
-            timestamp=datetime.fromisoformat(pool_data.get("timestamp", datetime.utcnow().isoformat())),
+            timestamp=timestamp,
             apr=Decimal(str(pool_data.get("apr", 0))),
             tvl=Decimal(str(pool_data.get("tvl", 0))),
             volume_24h=Decimal(str(pool_data.get("volume_24h", 0))),
