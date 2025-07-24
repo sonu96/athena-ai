@@ -54,7 +54,7 @@ async def start_agent():
     
     # Start collectors
     gas_monitor = GasMonitor(base_client, memory)
-    pool_scanner = PoolScanner(base_client, memory)
+    pool_scanner = PoolScanner(base_client, memory, firestore)
     
     # Set references for API
     set_agent_references(agent, memory, gas_monitor, pool_scanner)

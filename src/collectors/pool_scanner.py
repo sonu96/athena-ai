@@ -22,15 +22,23 @@ class PoolScanner:
     profitable opportunities for liquidity provision and trading.
     """
     
-    def __init__(self, base_client: BaseClient, memory: AthenaMemory):
+    def __init__(self, base_client: BaseClient, memory: AthenaMemory, firestore_client=None):
         """Initialize pool scanner."""
         self.base_client = base_client
         self.memory = memory
+        self.firestore_client = firestore_client
+        self.pool_profiles = None
         self.scanning = False
         
         # Pool data cache
         self.pools = {}
         self.last_scan = None
+        
+        # Initialize pool profile manager if firestore is available
+        if self.firestore_client:
+            from src.agent.pool_profiles import PoolProfileManager
+            self.pool_profiles = PoolProfileManager(self.firestore_client)
+            logger.info("Pool scanner initialized with pool profile manager")
         
         # Top opportunities
         self.opportunities = {
@@ -126,8 +134,8 @@ class PoolScanner:
                 "fee_apr": self._calculate_fee_apr(stable),
                 "incentive_apr": await self._estimate_incentive_apr(token_a, token_b),
                 "reserves": {
-                    token_a: pool_info.get("reserve0", Decimal("0")),
-                    token_b: pool_info.get("reserve1", Decimal("0")),
+                    token_a: pool_info.get("reserve_a", pool_info.get("reserve0", Decimal("0"))),
+                    token_b: pool_info.get("reserve_b", pool_info.get("reserve1", Decimal("0"))),
                 },
                 "ratio": pool_info.get("ratio", Decimal("1")),
                 "imbalanced": pool_info.get("imbalanced", False),
@@ -139,6 +147,32 @@ class PoolScanner:
             self.pools[pool_key] = pool_data
             
             logger.debug(f"Scanned pool {pool_key}: address={pool_data.get('address')}, APR={pool_data.get('apr')}%, TVL=${pool_data.get('tvl'):,.0f}")
+            
+            # Validate TVL for data quality
+            tvl = pool_data.get('tvl', Decimal('0'))
+            reserves = pool_data.get('reserves', {})
+            
+            # Check for unrealistic TVL values
+            if tvl > Decimal('1000000000'):  # $1B TVL seems unrealistic for most pools
+                logger.warning(f"Suspicious TVL for {pool_key}: ${tvl:,.0f} - may be a data issue")
+            elif tvl < Decimal('1000'):  # Less than $1k TVL might indicate empty pool
+                logger.warning(f"Very low TVL for {pool_key}: ${tvl:,.0f} - pool may be empty")
+            
+            # Log reserve details for validation
+            if reserves:
+                for token, reserve in reserves.items():
+                    if reserve > Decimal('1000000000'):  # 1B tokens seems excessive
+                        logger.warning(f"Suspicious reserve amount for {token} in {pool_key}: {reserve:,.0f}")
+            
+            # Update pool profile if available
+            if self.pool_profiles and pool_data.get("address"):
+                try:
+                    # Get current gas price
+                    gas_price = await self.base_client.get_gas_price()
+                    await self.pool_profiles.update_pool(pool_data, gas_price=gas_price)
+                    logger.info(f"Updated pool profile for {pool_key} at address {pool_data.get('address')}")
+                except Exception as e:
+                    logger.error(f"Failed to update pool profile for {pool_key}: {e}")
             
             return pool_data
             
@@ -268,7 +302,7 @@ class PoolScanner:
                             "incentive_apr": float(pool.get("incentive_apr", 0)),
                             "tvl": float(pool["tvl"]),
                             "stable": pool.get("stable", False),
-                            "timestamp": pool.get("timestamp"),
+                            "timestamp": pool.get("timestamp").isoformat() if isinstance(pool.get("timestamp"), datetime) else pool.get("timestamp"),
                         },
                         confidence=0.9 if pool["apr"] > 50 else 0.7
                     )
