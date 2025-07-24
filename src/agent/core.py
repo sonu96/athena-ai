@@ -45,7 +45,7 @@ class AthenaAgent:
         if settings.google_api_key:
             genai.configure(api_key=settings.google_api_key)
             self.model = genai.GenerativeModel(
-                model_name="gemini-1.5-flash",
+                model_name="gemini-1.5-flash-latest",
                 generation_config={
                     "temperature": 0.7,
                     "max_output_tokens": 2048,

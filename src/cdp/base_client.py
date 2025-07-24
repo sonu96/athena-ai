@@ -369,19 +369,16 @@ class BaseClient:
                 "stable": stable,
             }]
             
-            # Use SmartContract for read operations
-            from cdp import SmartContract
-            
-            router_contract = SmartContract(
-                network_id="base-mainnet",
+            # Use wallet's read_contract method
+            amounts_result = await self.wallet.read_contract(
                 contract_address=CONTRACTS["router"]["address"],
+                method="getAmountsOut",
+                args={
+                    "amountIn": str(int(amount_in * 10**18)),
+                    "routes": route
+                },
                 abi=CONTRACTS["router"]["abi"]
             )
-            
-            amounts_result = router_contract.read("getAmountsOut", {
-                "amountIn": str(int(amount_in * 10**18)),
-                "routes": route
-            })
             
             # The result is an array where the last element is the output amount
             if amounts_result and len(amounts_result) > 1:
