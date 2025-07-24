@@ -135,6 +135,10 @@ class EventMonitor:
     async def _get_current_block(self) -> Optional[int]:
         """Get current block number."""
         try:
+            if not self.rpc_reader or not self.rpc_reader.session:
+                logger.error("RPC reader or session not initialized")
+                return None
+                
             payload = {
                 "jsonrpc": "2.0",
                 "method": "eth_blockNumber",
@@ -202,6 +206,9 @@ class EventMonitor:
     ) -> List[Dict]:
         """Get events from the blockchain."""
         try:
+            if not self.rpc_reader or not self.rpc_reader.session:
+                logger.error("RPC reader or session not initialized")
+                return []
             # Limit range to prevent timeout
             max_range = 1000
             if to_block - from_block > max_range:
@@ -308,6 +315,9 @@ class EventMonitor:
     async def _get_block_timestamp(self, block_number: int) -> Optional[datetime]:
         """Get timestamp for a block."""
         try:
+            if not self.rpc_reader or not self.rpc_reader.session:
+                logger.error("RPC reader or session not initialized")
+                return None
             payload = {
                 "jsonrpc": "2.0",
                 "method": "eth_getBlockByNumber",

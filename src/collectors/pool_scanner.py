@@ -4,7 +4,7 @@ Aerodrome Pool Scanner
 import asyncio
 import logging
 from datetime import datetime
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 from decimal import Decimal
 
 from src.cdp.base_client import BaseClient
@@ -85,7 +85,9 @@ class PoolScanner:
         if not self.event_monitor:
             from src.blockchain.rpc_reader import RPCReader
             from config.settings import settings
-            self.event_monitor = EventMonitor()
+            # Create event monitor with RPC reader
+            rpc_reader = RPCReader(settings.cdp_rpc_url)
+            self.event_monitor = EventMonitor(rpc_reader)
             # Start monitoring for known pools
             pool_addresses = []
             for pair in self._get_pairs_to_scan():
