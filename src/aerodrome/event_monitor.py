@@ -112,7 +112,11 @@ class EventMonitor:
                 return
                 
             # Get last processed block
-            from_block = self.last_block_processed.get(pool_address, current_block - 1000)
+            # For initial scan, look back 24 hours (approximately 43200 blocks at 2s/block)
+            if pool_address not in self.last_block_processed:
+                from_block = max(1, current_block - 43200)  # ~24 hours
+            else:
+                from_block = self.last_block_processed.get(pool_address, current_block - 1000)
             
             # Don't process if we're caught up
             if from_block >= current_block:

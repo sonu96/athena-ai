@@ -148,16 +148,36 @@ class AthenaMemory:
                 for k, v in entry.metadata.items():
                     safe_metadata[k] = convert_value(v)
                 
-                result = self.memory.add(
-                    messages=messages,
-                    user_id=self.user_id,
-                    metadata={
-                        **safe_metadata,
+                # Prepare full metadata
+                full_metadata = {
+                    **safe_metadata,
+                    "type": memory_type.value,
+                    "category": category,
+                    "confidence": confidence,
+                    "timestamp": entry.timestamp.isoformat(),
+                }
+                
+                # Check metadata size and limit if necessary
+                import json
+                metadata_str = json.dumps(full_metadata)
+                if len(metadata_str) > 1900:  # Mem0 has 2000 char limit, leave buffer
+                    # Keep only essential fields
+                    limited_metadata = {
                         "type": memory_type.value,
                         "category": category,
                         "confidence": confidence,
                         "timestamp": entry.timestamp.isoformat(),
                     }
+                    # Add most important custom fields if they exist
+                    for key in ["pool", "apr", "tvl", "volume", "pattern_type"]:
+                        if key in safe_metadata:
+                            limited_metadata[key] = safe_metadata[key]
+                    full_metadata = limited_metadata
+                
+                result = self.memory.add(
+                    messages=messages,
+                    user_id=self.user_id,
+                    metadata=full_metadata
                 )
                 
                 # Handle different response formats from Mem0

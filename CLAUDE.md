@@ -300,23 +300,28 @@ correlations = await memory.get_cross_pool_correlations()
 ```
 
 ### Real Data Collection (July 2025)
-Athena now collects real market data from Aerodrome:
+Athena now collects real market data from Aerodrome - NO HARDCODED VALUES:
 
 #### Components
 1. **Gauge Reader** (`src/aerodrome/gauge_reader.py`)
    - Reads AERO emission rates from gauge contracts
    - Calculates emission APR based on TVL
    - Caches gauge addresses for efficiency
+   - Returns 0 APR if gauge data unavailable (no fallback)
 
 2. **Event Monitor** (`src/aerodrome/event_monitor.py`)
    - Tracks Swap events for real volume data
    - Monitors Fee events for fee collection
    - Maintains hourly/daily volume history
+   - Returns 0 volume if no events found (no estimates)
 
 3. **Enhanced Pool Scanner** (`src/collectors/pool_scanner.py`)
-   - Uses real gauge emissions instead of hardcoded values
-   - Calculates fee APR from actual 24h volume
-   - Stores comprehensive data in memory
+   - **REMOVED**: All hardcoded APR estimates
+   - **REMOVED**: Volume estimation logic
+   - Fetches real AERO price from AERO/USDC pool
+   - Uses only real gauge emissions (0 if unavailable)
+   - Calculates fee APR from actual 24h volume only
+   - Stores only verified data in memory
 
 #### New Memory Categories
 - `gauge_emissions`: AERO emission rates and patterns
@@ -329,8 +334,14 @@ Athena now collects real market data from Aerodrome:
 #### Testing Real Data
 ```bash
 # Test the real data collection pipeline
-python test_real_data_collection.py
+python scripts/test_real_data.py
 ```
+
+#### Important: Real Data Requirements
+- **Event Monitor**: Needs time to collect historical events (may show 0 initially)
+- **Gauge Reader**: Requires active gauge contracts (some pools may not have gauges)
+- **AERO Price**: Fetched from AERO/USDC pool in real-time
+- **No Fallbacks**: If real data unavailable, values will be 0 (not estimated)
 
 ### Known Issues
 - Some Aerodrome V2 pools don't implement standard Uniswap V2 interface

@@ -150,7 +150,7 @@ class PoolScanner:
                 
             # Calculate real APRs
             pool_address = pool_info.get("address")
-            volume_24h = await self._estimate_volume(pool_info, stable)
+            volume_24h = await self._get_real_volume(pool_info)
             total_apr, fee_apr, emission_apr = await self._calculate_real_apr(
                 pool_info, pool_address, stable
             )
@@ -205,29 +205,19 @@ class PoolScanner:
         
         return fee_apr
     
-    async def _estimate_volume(self, pool_info: Dict, stable: bool) -> Decimal:
-        """Get real 24h volume from event monitor or estimate if not available."""
-        # Try to get real volume from event monitor
+    async def _get_real_volume(self, pool_info: Dict) -> Decimal:
+        """Get real 24h volume from event monitor only - no estimates."""
         if self.event_monitor and pool_info.get("address"):
             real_volume = self.event_monitor.get_24h_volume(pool_info["address"])
             if real_volume > 0:
-                logger.debug(f"Using real volume for {pool_info['address']}: ${real_volume:,.0f}")
+                logger.info(f"Real 24h volume for {pool_info['address']}: ${real_volume:,.0f}")
                 return real_volume
+            else:
+                logger.warning(f"No volume data available for {pool_info['address']}")
+                return Decimal("0")
         
-        # Fall back to estimation
-        tvl = pool_info.get("tvl", Decimal("0"))
-        if tvl == 0:
-            return Decimal("0")
-            
-        # Stable pools typically have higher volume/TVL ratio
-        if stable:
-            volume_ratio = Decimal("0.8")  # 80% daily volume
-        else:
-            volume_ratio = Decimal("0.5")  # 50% daily volume
-            
-        estimated_volume = tvl * volume_ratio
-        logger.debug(f"Estimated volume for {pool_info.get('address', 'unknown')}: ${estimated_volume:,.0f}")
-        return estimated_volume
+        logger.error(f"Event monitor not available - cannot get volume for {pool_info.get('address', 'unknown')}")
+        return Decimal("0")
     
     async def _calculate_real_apr(self, pool_info: Dict, pool_address: str, stable: bool) -> Tuple[Decimal, Decimal, Decimal]:
         """Calculate real APR from pool data and gauge emissions.
@@ -239,26 +229,28 @@ class PoolScanner:
         if tvl == 0:
             return Decimal("0"), Decimal("0"), Decimal("0")
             
-        # Calculate fee APR from actual volume
-        volume_24h = await self._estimate_volume(pool_info, stable)
+        # Calculate fee APR from actual volume only
+        volume_24h = await self._get_real_volume(pool_info)
         fee_apr = self._calculate_fee_apr(volume_24h, tvl, stable)
         
-        # Get real emission APR from gauge
+        # Get real emission APR from gauge - NO FALLBACK TO ESTIMATES
         emission_apr = Decimal("0")
         if self.gauge_reader and pool_address:
             try:
-                emission_apr = await self.gauge_reader.calculate_emission_apr(
-                    pool_address,
-                    tvl,
-                    aero_price=Decimal("1.8")  # TODO: Get real AERO price
-                )
+                # Get real AERO price first
+                aero_price = await self._get_real_aero_price()
+                if aero_price > 0:
+                    emission_apr = await self.gauge_reader.calculate_emission_apr(
+                        pool_address,
+                        tvl,
+                        aero_price=aero_price
+                    )
+                    logger.info(f"Real emission APR for {pool_address}: {emission_apr:.2f}%")
+                else:
+                    logger.warning(f"Cannot calculate emission APR without AERO price")
             except Exception as e:
                 logger.error(f"Failed to get emission APR for {pool_address}: {e}")
-                # Fall back to estimate
-                emission_apr = await self._estimate_incentive_apr(
-                    pool_info.get("token_a", ""),
-                    pool_info.get("token_b", "")
-                )
+                # NO FALLBACK - real data only
         
         total_apr = fee_apr + emission_apr
         
@@ -269,22 +261,28 @@ class PoolScanner:
         
         return total_apr, fee_apr, emission_apr
     
-    async def _estimate_incentive_apr(self, token_a: str, token_b: str) -> Decimal:
-        """Estimate incentive APR from AERO emissions."""
-        # In production, this would query gauge contracts for actual emissions
-        # For now, use estimates based on pool importance
-        
-        # AERO pairs get highest incentives
-        if "AERO" in token_a or "AERO" in token_b:
-            return Decimal("70.0")
-        # Major pairs get good incentives
-        elif ("WETH" in token_a or "WETH" in token_b) and ("USDC" in token_a or "USDC" in token_b):
-            return Decimal("40.0")
-        # Stable pairs get moderate incentives
-        elif "USD" in token_a and "USD" in token_b:
-            return Decimal("20.0")
-        else:
-            return Decimal("10.0")
+    async def _get_real_aero_price(self) -> Decimal:
+        """Get real AERO token price from DEX."""
+        try:
+            # Get AERO/USDC pool info to determine price
+            pool_info = await self.base_client.get_pool_info("AERO", "USDC", False)
+            if pool_info and pool_info.get("reserve0") and pool_info.get("reserve1"):
+                # Assuming AERO is token0 and USDC is token1
+                aero_reserve = pool_info["reserve0"]
+                usdc_reserve = pool_info["reserve1"]
+                
+                if aero_reserve > 0:
+                    # Price = USDC per AERO
+                    aero_price = usdc_reserve / aero_reserve
+                    logger.info(f"Real AERO price from DEX: ${aero_price:.4f}")
+                    return aero_price
+                    
+        except Exception as e:
+            logger.error(f"Failed to fetch AERO price: {e}")
+            
+        # If we can't get the price, return 0 (no emissions APR)
+        logger.warning("Could not fetch real AERO price - emission APR will be 0")
+        return Decimal("0")
             
     async def _categorize_opportunity(self, pool_data: Dict, opportunities: Dict):
         """Categorize pool as an opportunity."""

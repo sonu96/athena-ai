@@ -329,12 +329,42 @@ class BaseClient:
             if reserve1 > Decimal(10**30):  # Likely raw value  
                 reserve1 = reserve1 / Decimal(10**decimals1)
             
-            # Calculate TVL (simplified - assumes $1 per token for now)
-            # In production, you'd fetch actual token prices
-            tvl = reserve0 + reserve1
+            # Calculate TVL using pool ratios and known stablecoin values
+            # Stablecoins we can use as price anchors
+            stablecoins = {
+                "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",  # USDC
+                "0xd9aAEc86B65D86f6A7B5B1b0c42FFA531710b6CA",  # USDbC
+                "0x50c5725949A6F0c72E6C4a641F24049A917DB0Cb",  # DAI
+            }
+            
+            token0_addr = token_info["token0"].lower()
+            token1_addr = token_info["token1"].lower()
+            
+            # If one token is a stablecoin, we can calculate the other token's price
+            if token0_addr in stablecoins:
+                # token0 is $1, so token1 price = reserve0 / reserve1
+                token1_price = reserve0 / reserve1 if reserve1 > 0 else Decimal("0")
+                tvl = reserve0 + (reserve1 * token1_price)
+            elif token1_addr in stablecoins:
+                # token1 is $1, so token0 price = reserve1 / reserve0
+                token0_price = reserve1 / reserve0 if reserve0 > 0 else Decimal("0")
+                tvl = (reserve0 * token0_price) + reserve1
+            else:
+                # Neither is stablecoin, need to get price from another source
+                # For now, just sum reserves (will be fixed later)
+                tvl = reserve0 + reserve1
+                logger.warning(f"No stablecoin in pool {token_a}/{token_b}, TVL calculation may be incorrect")
             
             # Calculate pool token ratio
             ratio = reserve0 / reserve1 if reserve1 > 0 else Decimal(0)
+            
+            # Map reserves to the correct tokens based on token0/token1 ordering
+            if token_a_address.lower() == token0_addr:
+                reserve_a = reserve0
+                reserve_b = reserve1
+            else:
+                reserve_a = reserve1
+                reserve_b = reserve0
             
             return {
                 "address": pool_address,
@@ -343,6 +373,8 @@ class BaseClient:
                 "stable": stable,
                 "reserve0": reserve0,
                 "reserve1": reserve1,
+                "reserve_a": reserve_a,
+                "reserve_b": reserve_b,
                 "total_supply": total_supply_decimal,
                 "tvl": tvl,
                 "ratio": ratio,
