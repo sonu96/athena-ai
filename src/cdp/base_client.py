@@ -324,17 +324,35 @@ class BaseClient:
             decimals1 = decimals_map.get(token_info["token1"].lower(), 18)
             
             # Log raw reserves before decimal conversion
-            logger.debug(
+            logger.info(
                 f"Raw reserves for {pool_address}: "
                 f"reserve0={reserve0}, reserve1={reserve1}"
             )
             
-            # Apply correct decimals - reserves are always raw values now
+            # Apply correct decimals - reserves are always raw values
+            # For stable pools, check if we're getting unexpected small values
+            if stable and (reserve0 < 1000 or reserve1 < 1000):
+                logger.warning(
+                    f"Suspiciously small reserves for stable pool {pool_address}: "
+                    f"reserve0={reserve0}, reserve1={reserve1}. "
+                    f"These may already be divided by 10^18 from getReserves()"
+                )
+                # If reserves are less than 1000 but greater than 0.001, they might be pre-divided by 10^18
+                if reserve0 < 1000 and reserve0 > Decimal("0.001"):
+                    # Restore to raw value by multiplying by 10^18
+                    reserve0 = reserve0 * Decimal(10**18)
+                    logger.info(f"Restored reserve0 to raw value: {reserve0}")
+                if reserve1 < 1000 and reserve1 > Decimal("0.001"):
+                    # Restore to raw value by multiplying by 10^18
+                    reserve1 = reserve1 * Decimal(10**18)
+                    logger.info(f"Restored reserve1 to raw value: {reserve1}")
+            
+            # Now apply the correct decimals
             reserve0 = reserve0 / Decimal(10**decimals0)
             reserve1 = reserve1 / Decimal(10**decimals1)
             
             # Log after decimal conversion
-            logger.debug(
+            logger.info(
                 f"Adjusted reserves for {pool_address}: "
                 f"reserve0={reserve0} (decimals={decimals0}), "
                 f"reserve1={reserve1} (decimals={decimals1})"
