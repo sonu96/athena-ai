@@ -55,7 +55,7 @@ class RPCReader:
             encoded_functions = {
                 "getReserves()": "0x0902f1ac",
                 "totalSupply()": "0x18160ddd",
-                "getPair(address,address,bool)": "0x6801cc30",
+                "getPool(address,address,bool)": "0x79bc57d5",
                 "token0()": "0x0dfe1681",
                 "token1()": "0xd21220a7",
                 "decimals()": "0x313ce567",
@@ -63,10 +63,10 @@ class RPCReader:
                 "reserve1()": "0x5a76f25e",
             }
             
-            # Handle getPair with arguments
-            if function_signature.startswith("getPair") and function_args:
-                # Function selector for getPair(address,address,bool)
-                data = "0xe5e7b133"  # Correct selector for Aerodrome's getPair
+            # Handle getPool with arguments
+            if function_signature.startswith("getPool") and function_args:
+                # Function selector for getPool(address,address,bool)
+                data = "0x79bc57d5"  # Correct selector for Aerodrome's getPool
                 # Encode arguments (address, address, bool)
                 # Remove 0x prefix and pad addresses to 32 bytes
                 token0 = function_args[0].lower().replace("0x", "").zfill(64)
@@ -234,7 +234,7 @@ class RPCReader:
         try:
             result = await self.call_contract_function(
                 factory_address,
-                "getPair(address,address,bool)",
+                "getPool(address,address,bool)",
                 [token0, token1, stable]
             )
             

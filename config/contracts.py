@@ -54,14 +54,14 @@ CONTRACTS = {
         "address": "0x420DD381b31aEf6683db6B902084cB0FFECe40Da",
         "abi": [
             {
-                "name": "getPair",
+                "name": "getPool",
                 "type": "function",
                 "inputs": [
                     {"name": "tokenA", "type": "address"},
                     {"name": "tokenB", "type": "address"},
                     {"name": "stable", "type": "bool"}
                 ],
-                "outputs": [{"name": "pair", "type": "address"}]
+                "outputs": [{"name": "pool", "type": "address"}]
             },
             {
                 "name": "allPairsLength",
