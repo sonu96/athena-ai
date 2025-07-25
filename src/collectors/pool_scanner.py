@@ -75,6 +75,20 @@ class PoolScanner:
         """Single scanning cycle."""
         logger.info("Scanning Aerodrome pools...")
         
+        # Pre-fetch common token prices to populate cache
+        logger.info("Pre-fetching token prices...")
+        try:
+            # Fetch prices for major tokens
+            await self.base_client.get_token_price_usd(TOKENS["WETH"])
+            await self.base_client.get_token_price_usd(TOKENS["AERO"])
+            # USDC, DAI, USDbC are stablecoins, will be cached as $1
+            await self.base_client.get_token_price_usd(TOKENS["USDC"])
+            await self.base_client.get_token_price_usd(TOKENS["DAI"])
+            await self.base_client.get_token_price_usd(TOKENS["USDbC"])
+            logger.info("Token prices cached successfully")
+        except Exception as e:
+            logger.error(f"Error pre-fetching token prices: {e}")
+        
         # Initialize gauge reader and event monitor if needed
         if not self.gauge_reader:
             from src.blockchain.rpc_reader import RPCReader
@@ -150,7 +164,7 @@ class PoolScanner:
                 
             # Calculate real APRs
             pool_address = pool_info.get("address")
-            volume_24h = await self._estimate_volume(pool_info, stable)
+            volume_24h = await self._get_real_volume(pool_info)
             total_apr, fee_apr, emission_apr = await self._calculate_real_apr(
                 pool_info, pool_address, stable
             )
@@ -166,8 +180,8 @@ class PoolScanner:
                 "fee_apr": fee_apr,
                 "incentive_apr": emission_apr,
                 "reserves": {
-                    token_a: pool_info.get("reserve0", Decimal("0")),
-                    token_b: pool_info.get("reserve1", Decimal("0")),
+                    token_a: pool_info.get("reserve_a", Decimal("0")),
+                    token_b: pool_info.get("reserve_b", Decimal("0")),
                 },
                 "ratio": pool_info.get("ratio", Decimal("1")),
                 "imbalanced": pool_info.get("imbalanced", False),
@@ -205,29 +219,19 @@ class PoolScanner:
         
         return fee_apr
     
-    async def _estimate_volume(self, pool_info: Dict, stable: bool) -> Decimal:
-        """Get real 24h volume from event monitor or estimate if not available."""
-        # Try to get real volume from event monitor
+    async def _get_real_volume(self, pool_info: Dict) -> Decimal:
+        """Get real 24h volume from event monitor only - no estimates."""
         if self.event_monitor and pool_info.get("address"):
             real_volume = self.event_monitor.get_24h_volume(pool_info["address"])
             if real_volume > 0:
-                logger.debug(f"Using real volume for {pool_info['address']}: ${real_volume:,.0f}")
+                logger.info(f"Real 24h volume for {pool_info['address']}: ${real_volume:,.0f}")
                 return real_volume
+            else:
+                logger.warning(f"No volume data available for {pool_info['address']}")
+                return Decimal("0")
         
-        # Fall back to estimation
-        tvl = pool_info.get("tvl", Decimal("0"))
-        if tvl == 0:
-            return Decimal("0")
-            
-        # Stable pools typically have higher volume/TVL ratio
-        if stable:
-            volume_ratio = Decimal("0.8")  # 80% daily volume
-        else:
-            volume_ratio = Decimal("0.5")  # 50% daily volume
-            
-        estimated_volume = tvl * volume_ratio
-        logger.debug(f"Estimated volume for {pool_info.get('address', 'unknown')}: ${estimated_volume:,.0f}")
-        return estimated_volume
+        logger.error(f"Event monitor not available - cannot get volume for {pool_info.get('address', 'unknown')}")
+        return Decimal("0")
     
     async def _calculate_real_apr(self, pool_info: Dict, pool_address: str, stable: bool) -> Tuple[Decimal, Decimal, Decimal]:
         """Calculate real APR from pool data and gauge emissions.
@@ -239,26 +243,28 @@ class PoolScanner:
         if tvl == 0:
             return Decimal("0"), Decimal("0"), Decimal("0")
             
-        # Calculate fee APR from actual volume
-        volume_24h = await self._estimate_volume(pool_info, stable)
+        # Calculate fee APR from actual volume only
+        volume_24h = await self._get_real_volume(pool_info)
         fee_apr = self._calculate_fee_apr(volume_24h, tvl, stable)
         
-        # Get real emission APR from gauge
+        # Get real emission APR from gauge - NO FALLBACK TO ESTIMATES
         emission_apr = Decimal("0")
         if self.gauge_reader and pool_address:
             try:
-                emission_apr = await self.gauge_reader.calculate_emission_apr(
-                    pool_address,
-                    tvl,
-                    aero_price=Decimal("1.8")  # TODO: Get real AERO price
-                )
+                # Get real AERO price first
+                aero_price = await self._get_real_aero_price()
+                if aero_price > 0:
+                    emission_apr = await self.gauge_reader.calculate_emission_apr(
+                        pool_address,
+                        tvl,
+                        aero_price=aero_price
+                    )
+                    logger.info(f"Real emission APR for {pool_address}: {emission_apr:.2f}%")
+                else:
+                    logger.warning(f"Cannot calculate emission APR without AERO price")
             except Exception as e:
                 logger.error(f"Failed to get emission APR for {pool_address}: {e}")
-                # Fall back to estimate
-                emission_apr = await self._estimate_incentive_apr(
-                    pool_info.get("token_a", ""),
-                    pool_info.get("token_b", "")
-                )
+                # NO FALLBACK - real data only
         
         total_apr = fee_apr + emission_apr
         
@@ -269,22 +275,28 @@ class PoolScanner:
         
         return total_apr, fee_apr, emission_apr
     
-    async def _estimate_incentive_apr(self, token_a: str, token_b: str) -> Decimal:
-        """Estimate incentive APR from AERO emissions."""
-        # In production, this would query gauge contracts for actual emissions
-        # For now, use estimates based on pool importance
-        
-        # AERO pairs get highest incentives
-        if "AERO" in token_a or "AERO" in token_b:
-            return Decimal("70.0")
-        # Major pairs get good incentives
-        elif ("WETH" in token_a or "WETH" in token_b) and ("USDC" in token_a or "USDC" in token_b):
-            return Decimal("40.0")
-        # Stable pairs get moderate incentives
-        elif "USD" in token_a and "USD" in token_b:
-            return Decimal("20.0")
-        else:
-            return Decimal("10.0")
+    async def _get_real_aero_price(self) -> Decimal:
+        """Get real AERO token price from DEX."""
+        try:
+            # Get AERO/USDC pool info to determine price
+            pool_info = await self.base_client.get_pool_info("AERO", "USDC", False)
+            if pool_info and pool_info.get("reserve0") and pool_info.get("reserve1"):
+                # Assuming AERO is token0 and USDC is token1
+                aero_reserve = pool_info["reserve0"]
+                usdc_reserve = pool_info["reserve1"]
+                
+                if aero_reserve > 0:
+                    # Price = USDC per AERO
+                    aero_price = usdc_reserve / aero_reserve
+                    logger.info(f"Real AERO price from DEX: ${aero_price:.4f}")
+                    return aero_price
+                    
+        except Exception as e:
+            logger.error(f"Failed to fetch AERO price: {e}")
+            
+        # If we can't get the price, return 0 (no emissions APR)
+        logger.warning("Could not fetch real AERO price - emission APR will be 0")
+        return Decimal("0")
             
     async def _categorize_opportunity(self, pool_data: Dict, opportunities: Dict):
         """Categorize pool as an opportunity."""
@@ -332,46 +344,97 @@ class PoolScanner:
         min_apr_for_memory = getattr(settings, 'min_apr_for_memory', 20)
         min_volume_for_memory = getattr(settings, 'min_volume_for_memory', 100000)
         
+        # First, store ALL pools that meet basic criteria (not just categorized opportunities)
+        # This ensures we don't miss pools with APR between 20-50%
+        for pool_key, pool_data in self.pools.items():
+            # Store any pool with meaningful APR or volume
+            if pool_data.get("apr", 0) >= min_apr_for_memory or pool_data.get("volume_24h", 0) >= min_volume_for_memory:
+                # Create consistent observation structure
+                observation = {
+                    "type": "observation",
+                    "category": "pool_analysis",  # Use general category
+                    "timestamp": pool_data.get("timestamp", datetime.utcnow()).isoformat() if isinstance(pool_data.get("timestamp"), datetime) else pool_data.get("timestamp"),
+                    "confidence": 0.8,
+                    "pool": pool_data["pair"],
+                    "pool_address": pool_data.get("address"),
+                    "tvl": float(pool_data.get("tvl", 0)),
+                    "apr": float(pool_data.get("apr", 0)),
+                    "fee_apr": float(pool_data.get("fee_apr", 0)),
+                    "incentive_apr": float(pool_data.get("incentive_apr", 0)),
+                    "volume_24h": float(pool_data.get("volume_24h", 0)),
+                    "stable": pool_data.get("stable", False),
+                    "imbalanced": pool_data.get("imbalanced", False),
+                    "ratio": float(pool_data.get("ratio", 1)),
+                    "reserves": {k: float(v) for k, v in pool_data.get("reserves", {}).items()},
+                }
+                
+                await self.memory.remember(
+                    content=f"Pool analysis: {pool_data['pair']} - APR: {pool_data.get('apr', 0):.2f}%, Volume: ${pool_data.get('volume_24h', 0):,.0f}, TVL: ${pool_data.get('tvl', 0):,.0f}",
+                    memory_type=MemoryType.OBSERVATION,
+                    category="pool_analysis",
+                    metadata=observation,
+                    confidence=observation["confidence"]
+                )
+                logger.info(f"Stored pool data for {pool_data['pair']} with APR {pool_data.get('apr', 0):.2f}%")
+        
         # Store ALL high APR pools, not just the top one
         if opportunities["high_apr"]:
             for pool in opportunities["high_apr"]:
                 if pool["apr"] >= min_apr_for_memory:
+                    # Create consistent observation structure
+                    observation = {
+                        "type": "observation",
+                        "category": "pool_behavior",
+                        "timestamp": pool.get("timestamp", datetime.utcnow()).isoformat() if isinstance(pool.get("timestamp"), datetime) else pool.get("timestamp"),
+                        "confidence": 0.9 if pool["apr"] > 50 else 0.7,
+                        "pool": pool["pair"],
+                        "pool_address": pool.get("address"),
+                        "tvl": float(pool["tvl"]),
+                        "apr": float(pool["apr"]),
+                        "fee_apr": float(pool.get("fee_apr", 0)),
+                        "incentive_apr": float(pool.get("incentive_apr", 0)),
+                        "stable": pool.get("stable", False),
+                        "imbalanced": pool.get("imbalanced", False),
+                        "ratio": float(pool.get("ratio", 1)),
+                        "reserves": {k: float(v) for k, v in pool.get("reserves", {}).items()},
+                    }
+                    
                     await self.memory.remember(
                         content=f"High APR pool: {pool['pair']} at {pool['apr']}% APR (TVL: ${pool['tvl']:,.0f})",
                         memory_type=MemoryType.OBSERVATION,
                         category="pool_behavior",
-                        metadata={
-                            "pool": pool["pair"],
-                            "pool_address": pool.get("address"),
-                            "apr": float(pool["apr"]),
-                            "fee_apr": float(pool.get("fee_apr", 0)),
-                            "incentive_apr": float(pool.get("incentive_apr", 0)),
-                            "tvl": float(pool["tvl"]),
-                            "stable": pool.get("stable", False),
-                            "timestamp": pool.get("timestamp"),
-                        },
-                        confidence=0.9 if pool["apr"] > 50 else 0.7
+                        metadata=observation,
+                        confidence=observation["confidence"]
                     )
             
         # Store ALL high volume pools
         if opportunities["high_volume"]:
             for pool in opportunities["high_volume"]:
                 if pool["volume_24h"] >= min_volume_for_memory:
+                    # Create consistent observation structure
+                    observation = {
+                        "type": "observation",
+                        "category": "pool_behavior",
+                        "timestamp": pool.get("timestamp", datetime.utcnow()).isoformat() if isinstance(pool.get("timestamp"), datetime) else pool.get("timestamp"),
+                        "confidence": 0.9 if pool["volume_24h"] > 1000000 else 0.8,
+                        "pool": pool["pair"],
+                        "pool_address": pool.get("address"),
+                        "tvl": float(pool["tvl"]),
+                        "volume_24h": float(pool["volume_24h"]),
+                        "apr": float(pool["apr"]),
+                        "volume_to_tvl_ratio": float(pool["volume_24h"] / pool["tvl"]) if pool["tvl"] > 0 else 0,
+                        "stable": pool.get("stable", False),
+                        "imbalanced": pool.get("imbalanced", False),
+                        "ratio": float(pool.get("ratio", 1)),
+                        "reserves": {k: float(v) for k, v in pool.get("reserves", {}).items()},
+                    }
+                    
                     await self.memory.remember(
                         content=f"High volume pool: {pool['pair']} with ${pool['volume_24h']:,.0f} daily volume (APR: {pool['apr']}%)",
                         memory_type=MemoryType.OBSERVATION,
                         category="pool_behavior",
-                        metadata={
-                            "pool": pool["pair"],
-                            "pool_address": pool.get("address"),
-                            "volume": float(pool["volume_24h"]),
-                            "apr": float(pool["apr"]),
-                            "tvl": float(pool["tvl"]),
-                            "volume_to_tvl_ratio": float(pool["volume_24h"] / pool["tvl"]) if pool["tvl"] > 0 else 0,
-                            "stable": pool.get("stable", False),
-                            "timestamp": pool.get("timestamp"),
-                        },
-                        confidence=0.9 if pool["volume_24h"] > 1000000 else 0.8
+                        metadata=observation,
+                        confidence=observation["confidence"]
                     )
                     
         # Store imbalanced pools for arbitrage tracking
@@ -379,18 +442,26 @@ class PoolScanner:
             for pool in opportunities["imbalanced"]:
                 # Only store significantly imbalanced pools
                 if pool.get("ratio") and (pool["ratio"] > 2 or pool["ratio"] < 0.5):
+                    # Create consistent observation structure
+                    observation = {
+                        "type": "observation",
+                        "category": "arbitrage_opportunity",
+                        "timestamp": pool.get("timestamp", datetime.utcnow()).isoformat() if isinstance(pool.get("timestamp"), datetime) else pool.get("timestamp"),
+                        "confidence": 0.8,
+                        "pool": pool["pair"],
+                        "pool_address": pool.get("address"),
+                        "tvl": float(pool["tvl"]),
+                        "ratio": float(pool["ratio"]),
+                        "stable": pool.get("stable", False),
+                        "imbalanced": True,
+                        "reserves": {k: float(v) for k, v in pool.get("reserves", {}).items()},
+                    }
+                    
                     await self.memory.remember(
                         content=f"Imbalanced pool detected: {pool['pair']} with ratio {pool['ratio']:.4f}",
                         memory_type=MemoryType.OBSERVATION,
                         category="arbitrage_opportunity",
-                        metadata={
-                            "pool": pool["pair"],
-                            "pool_address": pool.get("address"),
-                            "ratio": float(pool["ratio"]),
-                            "reserves": pool.get("reserves"),
-                            "tvl": float(pool["tvl"]),
-                            "timestamp": pool.get("timestamp"),
-                        },
+                        metadata=observation,
                         confidence=0.8
                     )
                     

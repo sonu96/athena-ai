@@ -148,11 +148,25 @@ class AthenaAgent:
             try:
                 pool_info = await self.base_client.get_pool_info("WETH", "USDC", False)
                 if pool_info:
-                    observations.append({
-                        "type": "pools",
-                        "data": pool_info,
-                        "timestamp": datetime.utcnow().isoformat()
-                    })
+                    # Create flattened observation structure
+                    observation = {
+                        "type": "observation",
+                        "category": "market_pattern",
+                        "timestamp": datetime.utcnow().isoformat(),
+                        "confidence": 1.0,
+                        "pool": f"{pool_info['token_a']}/{pool_info['token_b']}",
+                        "pool_address": pool_info["address"],
+                        "tvl": float(pool_info["tvl"]),
+                        "ratio": float(pool_info["ratio"]),
+                        "stable": pool_info["stable"],
+                        "imbalanced": pool_info["imbalanced"],
+                        "reserves": {
+                            pool_info["token_a"]: float(pool_info["reserve_a"]),
+                            pool_info["token_b"]: float(pool_info["reserve_b"])
+                        },
+                        "total_supply": float(pool_info["total_supply"])
+                    }
+                    observations.append(observation)
             except Exception as e:
                 logger.error(f"Failed to get pool info: {e}")
                 observations.append({
@@ -163,12 +177,26 @@ class AthenaAgent:
             
             # Store observations in memory
             for obs in observations:
-                await self.memory.remember(
-                    content=f"Observed {obs['type']}: {obs['data']}",
-                    memory_type=MemoryType.OBSERVATION,
-                    category="market_pattern",
-                    metadata=obs
-                )
+                if obs["type"] == "observation":
+                    # For pool observations, create descriptive content
+                    content = f"Pool {obs['pool']} - TVL: ${obs['tvl']:,.0f}, Ratio: {obs['ratio']:.4f}"
+                    if obs.get("imbalanced"):
+                        content += " (IMBALANCED)"
+                    await self.memory.remember(
+                        content=content,
+                        memory_type=MemoryType.OBSERVATION,
+                        category=obs.get("category", "market_pattern"),
+                        metadata=obs,
+                        confidence=obs.get("confidence", 1.0)
+                    )
+                else:
+                    # For other observation types (gas, errors)
+                    await self.memory.remember(
+                        content=f"Observed {obs['type']}: {obs.get('data', obs)}",
+                        memory_type=MemoryType.OBSERVATION,
+                        category="market_pattern",
+                        metadata=obs
+                    )
                 
             # Update pool profiles with observed data
             if gas_price:
