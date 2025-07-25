@@ -166,8 +166,8 @@ class PoolScanner:
                 "fee_apr": fee_apr,
                 "incentive_apr": emission_apr,
                 "reserves": {
-                    token_a: pool_info.get("reserve0", Decimal("0")),
-                    token_b: pool_info.get("reserve1", Decimal("0")),
+                    token_a: pool_info.get("reserve_a", Decimal("0")),
+                    token_b: pool_info.get("reserve_b", Decimal("0")),
                 },
                 "ratio": pool_info.get("ratio", Decimal("1")),
                 "imbalanced": pool_info.get("imbalanced", False),
@@ -334,42 +334,60 @@ class PoolScanner:
         if opportunities["high_apr"]:
             for pool in opportunities["high_apr"]:
                 if pool["apr"] >= min_apr_for_memory:
+                    # Create consistent observation structure
+                    observation = {
+                        "type": "observation",
+                        "category": "pool_behavior",
+                        "timestamp": pool.get("timestamp", datetime.utcnow()).isoformat() if isinstance(pool.get("timestamp"), datetime) else pool.get("timestamp"),
+                        "confidence": 0.9 if pool["apr"] > 50 else 0.7,
+                        "pool": pool["pair"],
+                        "pool_address": pool.get("address"),
+                        "tvl": float(pool["tvl"]),
+                        "apr": float(pool["apr"]),
+                        "fee_apr": float(pool.get("fee_apr", 0)),
+                        "incentive_apr": float(pool.get("incentive_apr", 0)),
+                        "stable": pool.get("stable", False),
+                        "imbalanced": pool.get("imbalanced", False),
+                        "ratio": float(pool.get("ratio", 1)),
+                        "reserves": {k: float(v) for k, v in pool.get("reserves", {}).items()},
+                    }
+                    
                     await self.memory.remember(
                         content=f"High APR pool: {pool['pair']} at {pool['apr']}% APR (TVL: ${pool['tvl']:,.0f})",
                         memory_type=MemoryType.OBSERVATION,
                         category="pool_behavior",
-                        metadata={
-                            "pool": pool["pair"],
-                            "pool_address": pool.get("address"),
-                            "apr": float(pool["apr"]),
-                            "fee_apr": float(pool.get("fee_apr", 0)),
-                            "incentive_apr": float(pool.get("incentive_apr", 0)),
-                            "tvl": float(pool["tvl"]),
-                            "stable": pool.get("stable", False),
-                            "timestamp": pool.get("timestamp"),
-                        },
-                        confidence=0.9 if pool["apr"] > 50 else 0.7
+                        metadata=observation,
+                        confidence=observation["confidence"]
                     )
             
         # Store ALL high volume pools
         if opportunities["high_volume"]:
             for pool in opportunities["high_volume"]:
                 if pool["volume_24h"] >= min_volume_for_memory:
+                    # Create consistent observation structure
+                    observation = {
+                        "type": "observation",
+                        "category": "pool_behavior",
+                        "timestamp": pool.get("timestamp", datetime.utcnow()).isoformat() if isinstance(pool.get("timestamp"), datetime) else pool.get("timestamp"),
+                        "confidence": 0.9 if pool["volume_24h"] > 1000000 else 0.8,
+                        "pool": pool["pair"],
+                        "pool_address": pool.get("address"),
+                        "tvl": float(pool["tvl"]),
+                        "volume_24h": float(pool["volume_24h"]),
+                        "apr": float(pool["apr"]),
+                        "volume_to_tvl_ratio": float(pool["volume_24h"] / pool["tvl"]) if pool["tvl"] > 0 else 0,
+                        "stable": pool.get("stable", False),
+                        "imbalanced": pool.get("imbalanced", False),
+                        "ratio": float(pool.get("ratio", 1)),
+                        "reserves": {k: float(v) for k, v in pool.get("reserves", {}).items()},
+                    }
+                    
                     await self.memory.remember(
                         content=f"High volume pool: {pool['pair']} with ${pool['volume_24h']:,.0f} daily volume (APR: {pool['apr']}%)",
                         memory_type=MemoryType.OBSERVATION,
                         category="pool_behavior",
-                        metadata={
-                            "pool": pool["pair"],
-                            "pool_address": pool.get("address"),
-                            "volume": float(pool["volume_24h"]),
-                            "apr": float(pool["apr"]),
-                            "tvl": float(pool["tvl"]),
-                            "volume_to_tvl_ratio": float(pool["volume_24h"] / pool["tvl"]) if pool["tvl"] > 0 else 0,
-                            "stable": pool.get("stable", False),
-                            "timestamp": pool.get("timestamp"),
-                        },
-                        confidence=0.9 if pool["volume_24h"] > 1000000 else 0.8
+                        metadata=observation,
+                        confidence=observation["confidence"]
                     )
                     
         # Store imbalanced pools for arbitrage tracking
@@ -377,18 +395,26 @@ class PoolScanner:
             for pool in opportunities["imbalanced"]:
                 # Only store significantly imbalanced pools
                 if pool.get("ratio") and (pool["ratio"] > 2 or pool["ratio"] < 0.5):
+                    # Create consistent observation structure
+                    observation = {
+                        "type": "observation",
+                        "category": "arbitrage_opportunity",
+                        "timestamp": pool.get("timestamp", datetime.utcnow()).isoformat() if isinstance(pool.get("timestamp"), datetime) else pool.get("timestamp"),
+                        "confidence": 0.8,
+                        "pool": pool["pair"],
+                        "pool_address": pool.get("address"),
+                        "tvl": float(pool["tvl"]),
+                        "ratio": float(pool["ratio"]),
+                        "stable": pool.get("stable", False),
+                        "imbalanced": True,
+                        "reserves": {k: float(v) for k, v in pool.get("reserves", {}).items()},
+                    }
+                    
                     await self.memory.remember(
                         content=f"Imbalanced pool detected: {pool['pair']} with ratio {pool['ratio']:.4f}",
                         memory_type=MemoryType.OBSERVATION,
                         category="arbitrage_opportunity",
-                        metadata={
-                            "pool": pool["pair"],
-                            "pool_address": pool.get("address"),
-                            "ratio": float(pool["ratio"]),
-                            "reserves": pool.get("reserves"),
-                            "tvl": float(pool["tvl"]),
-                            "timestamp": pool.get("timestamp"),
-                        },
+                        metadata=observation,
                         confidence=0.8
                     )
                     

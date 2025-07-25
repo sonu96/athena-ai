@@ -157,9 +157,10 @@ class RPCReader:
                 reserve0_hex = hex_data[0:64]
                 reserve1_hex = hex_data[64:128]
                 
-                # Convert to decimal
-                reserve0 = Decimal(int(reserve0_hex, 16)) / Decimal(10**18)
-                reserve1 = Decimal(int(reserve1_hex, 16)) / Decimal(10**18)
+                # Convert to decimal - return raw values
+                # Decimals will be handled by the caller based on token info
+                reserve0 = Decimal(int(reserve0_hex, 16))
+                reserve1 = Decimal(int(reserve1_hex, 16))
                 
                 return {
                     "reserve0": reserve0,
@@ -215,8 +216,9 @@ class RPCReader:
             if not result or result == "0x0":
                 return None
                 
-            # Convert hex to decimal
-            supply = Decimal(int(result, 16)) / Decimal(10**18)
+            # Convert hex to decimal - return raw value
+            # Decimals will be handled by the caller
+            supply = Decimal(int(result, 16))
             return supply
             
         except Exception as e:

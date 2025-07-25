@@ -308,33 +308,35 @@ class BaseClient:
                 total_supply_decimal = await reader.get_total_supply(pool_address)
                 if not total_supply_decimal:
                     total_supply_decimal = Decimal("0")
+                else:
+                    # Apply decimals - RPC reader now returns raw values
+                    # LP tokens always have 18 decimals
+                    total_supply_decimal = total_supply_decimal / Decimal(10**18)
                     
             # Determine decimals based on token addresses
-            # Common Base tokens
+            # Common Base tokens (lowercase for comparison)
             decimals_map = {
                 "0x4200000000000000000000000000000000000006": 18,  # WETH
-                "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913": 6,   # USDC
-                "0xd9aAEc86B65D86f6A7B5B1b0c42FFA531710b6CA": 6,   # USDbC
-                "0x50c5725949A6F0c72E6C4a641F24049A917DB0Cb": 18,  # DAI
-                "0x940181a94A35A4569E4529A3CDfB74e38FD98631": 18,  # AERO
+                "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913": 6,   # USDC
+                "0xd9aaec86b65d86f6a7b5b1b0c42ffa531710b6ca": 6,   # USDbC
+                "0x50c5725949a6f0c72e6c4a641f24049a917db0cb": 18,  # DAI
+                "0x940181a94a35a4569e4529a3cdfb74e38fd98631": 18,  # AERO
             }
             
             # Get decimals for token0 and token1
             decimals0 = decimals_map.get(token_info["token0"].lower(), 18)
             decimals1 = decimals_map.get(token_info["token1"].lower(), 18)
             
-            # Apply correct decimals if we got raw values from storage
-            if reserve0 > Decimal(10**30):  # Likely raw value
-                reserve0 = reserve0 / Decimal(10**decimals0)
-            if reserve1 > Decimal(10**30):  # Likely raw value  
-                reserve1 = reserve1 / Decimal(10**decimals1)
+            # Apply decimals - RPC reader now returns raw values
+            reserve0 = reserve0 / Decimal(10**decimals0)
+            reserve1 = reserve1 / Decimal(10**decimals1)
             
             # Calculate TVL using pool ratios and known stablecoin values
-            # Stablecoins we can use as price anchors
+            # Stablecoins we can use as price anchors (lowercase for comparison)
             stablecoins = {
-                "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",  # USDC
-                "0xd9aAEc86B65D86f6A7B5B1b0c42FFA531710b6CA",  # USDbC
-                "0x50c5725949A6F0c72E6C4a641F24049A917DB0Cb",  # DAI
+                "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",  # USDC
+                "0xd9aaec86b65d86f6a7b5b1b0c42ffa531710b6ca",  # USDbC
+                "0x50c5725949a6f0c72e6c4a641f24049a917db0cb",  # DAI
             }
             
             token0_addr = token_info["token0"].lower()
