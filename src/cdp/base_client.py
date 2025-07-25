@@ -3,6 +3,7 @@ CDP SDK Wrapper for Base Chain Operations
 """
 import asyncio
 import logging
+import time
 from typing import Dict, List, Optional, Tuple
 from decimal import Decimal
 
@@ -25,6 +26,17 @@ class BaseClient:
         self.wallet = None
         self._initialized = False
         self._wallet_secret = None
+        
+        # Price cache for token USD prices
+        self.price_cache = {}  # token_addr -> {"price": Decimal, "timestamp": float, "source": str}
+        self.CACHE_DURATION = 300  # 5 minutes
+        
+        # Stablecoins that are always $1
+        self.stablecoins = {
+            "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",  # USDC
+            "0xd9aaec86b65d86f6a7b5b1b0c42ffa531710b6ca",  # USDbC
+            "0x50c5725949a6f0c72e6c4a641f24049a917db0cb",  # DAI
+        }
         
     async def initialize(self):
         """Initialize CDP SDK and wallet."""
@@ -213,6 +225,109 @@ class BaseClient:
             logger.error(f"Swap failed: {e}")
             return None
             
+    async def get_token_price_usd(self, token_addr: str) -> Decimal:
+        """Get USD price for token with caching.
+        
+        Args:
+            token_addr: Token address to get price for
+            
+        Returns:
+            Token price in USD
+        """
+        # Normalize address to lowercase
+        token_addr = token_addr.lower()
+        
+        # Check cache first
+        if token_addr in self.price_cache:
+            cache_entry = self.price_cache[token_addr]
+            if time.time() - cache_entry["timestamp"] < self.CACHE_DURATION:
+                logger.debug(f"Using cached price for {token_addr}: ${cache_entry['price']:.4f}")
+                return cache_entry["price"]
+        
+        # Stablecoins are always $1
+        if token_addr in self.stablecoins:
+            price = Decimal("1.0")
+            self.price_cache[token_addr] = {
+                "price": price,
+                "timestamp": time.time(),
+                "source": "stablecoin"
+            }
+            return price
+        
+        # Get price from DEX pools
+        price = Decimal("0")
+        source = "unknown"
+        
+        try:
+            # WETH price from WETH/USDC pool
+            if token_addr == TOKENS["WETH"].lower():
+                # Get pool info without TVL calculation to avoid recursion
+                from src.blockchain.rpc_reader import RPCReader
+                async with RPCReader(settings.cdp_rpc_url) as reader:
+                    pool_address = await self._get_pool_address("WETH", "USDC", False)
+                    if pool_address:
+                        # First get token info to determine token ordering
+                        token_info = await reader.get_token_info(pool_address)
+                        reserves_data = await reader.get_pool_reserves(pool_address)
+                        
+                        if token_info and reserves_data:
+                            # Determine which reserve is WETH and which is USDC
+                            if token_info["token0"].lower() == TOKENS["WETH"].lower():
+                                # WETH is token0, USDC is token1
+                                weth_reserve = reserves_data["reserve0"] / Decimal(10**18)  # WETH has 18 decimals
+                                usdc_reserve = reserves_data["reserve1"] / Decimal(10**6)   # USDC has 6 decimals
+                            else:
+                                # USDC is token0, WETH is token1
+                                usdc_reserve = reserves_data["reserve0"] / Decimal(10**6)
+                                weth_reserve = reserves_data["reserve1"] / Decimal(10**18)
+                            
+                            if weth_reserve > 0:
+                                price = usdc_reserve / weth_reserve  # USDC per WETH
+                                source = "WETH/USDC"
+                                logger.info(f"WETH price from DEX: ${price:.2f}")
+            
+            # AERO price from AERO/USDC pool
+            elif token_addr == TOKENS["AERO"].lower():
+                # Get pool info without TVL calculation to avoid recursion
+                from src.blockchain.rpc_reader import RPCReader
+                async with RPCReader(settings.cdp_rpc_url) as reader:
+                    pool_address = await self._get_pool_address("AERO", "USDC", False)
+                    if pool_address:
+                        # First get token info to determine token ordering
+                        token_info = await reader.get_token_info(pool_address)
+                        reserves_data = await reader.get_pool_reserves(pool_address)
+                        
+                        if token_info and reserves_data:
+                            # Determine which reserve is AERO and which is USDC
+                            if token_info["token0"].lower() == TOKENS["AERO"].lower():
+                                # AERO is token0, USDC is token1
+                                aero_reserve = reserves_data["reserve0"] / Decimal(10**18)  # AERO has 18 decimals
+                                usdc_reserve = reserves_data["reserve1"] / Decimal(10**6)   # USDC has 6 decimals
+                            else:
+                                # USDC is token0, AERO is token1
+                                usdc_reserve = reserves_data["reserve0"] / Decimal(10**6)
+                                aero_reserve = reserves_data["reserve1"] / Decimal(10**18)
+                            
+                            if aero_reserve > 0:
+                                price = usdc_reserve / aero_reserve  # USDC per AERO
+                                source = "AERO/USDC"
+                                logger.info(f"AERO price from DEX: ${price:.4f}")
+            
+            # Cache the result
+            if price > 0:
+                self.price_cache[token_addr] = {
+                    "price": price,
+                    "timestamp": time.time(),
+                    "source": source
+                }
+            else:
+                logger.warning(f"Could not determine price for token {token_addr}")
+                
+        except Exception as e:
+            logger.error(f"Error getting price for {token_addr}: {e}")
+        
+        return price
+    
     async def add_liquidity(
         self,
         token_a: str,
@@ -331,31 +446,24 @@ class BaseClient:
             reserve0 = reserve0 / Decimal(10**decimals0)
             reserve1 = reserve1 / Decimal(10**decimals1)
             
-            # Calculate TVL using pool ratios and known stablecoin values
-            # Stablecoins we can use as price anchors (lowercase for comparison)
-            stablecoins = {
-                "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",  # USDC
-                "0xd9aaec86b65d86f6a7b5b1b0c42ffa531710b6ca",  # USDbC
-                "0x50c5725949a6f0c72e6c4a641f24049a917db0cb",  # DAI
-            }
-            
+            # Calculate TVL using cached token prices
             token0_addr = token_info["token0"].lower()
             token1_addr = token_info["token1"].lower()
             
-            # If one token is a stablecoin, we can calculate the other token's price
-            if token0_addr in stablecoins:
-                # token0 is $1, so token1 price = reserve0 / reserve1
-                token1_price = reserve0 / reserve1 if reserve1 > 0 else Decimal("0")
-                tvl = reserve0 + (reserve1 * token1_price)
-            elif token1_addr in stablecoins:
-                # token1 is $1, so token0 price = reserve1 / reserve0
-                token0_price = reserve1 / reserve0 if reserve0 > 0 else Decimal("0")
-                tvl = (reserve0 * token0_price) + reserve1
+            # Get USD prices for both tokens
+            price0 = await self.get_token_price_usd(token0_addr)
+            price1 = await self.get_token_price_usd(token1_addr)
+            
+            # Calculate TVL
+            if price0 > 0 and price1 > 0:
+                tvl = (reserve0 * price0) + (reserve1 * price1)
+                logger.debug(f"TVL calculation for {token_a}/{token_b}: "
+                           f"reserve0={reserve0:.4f} * price0=${price0:.4f} + "
+                           f"reserve1={reserve1:.4f} * price1=${price1:.4f} = ${tvl:,.2f}")
             else:
-                # Neither is stablecoin, need to get price from another source
-                # For now, just sum reserves (will be fixed later)
-                tvl = reserve0 + reserve1
-                logger.warning(f"No stablecoin in pool {token_a}/{token_b}, TVL calculation may be incorrect")
+                # If we can't get prices, log warning and use 0
+                tvl = Decimal("0")
+                logger.warning(f"Unable to calculate TVL for {token_a}/{token_b} - missing price data")
             
             # Calculate pool token ratio
             ratio = reserve0 / reserve1 if reserve1 > 0 else Decimal(0)

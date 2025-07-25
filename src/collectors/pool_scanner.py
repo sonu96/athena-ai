@@ -75,6 +75,20 @@ class PoolScanner:
         """Single scanning cycle."""
         logger.info("Scanning Aerodrome pools...")
         
+        # Pre-fetch common token prices to populate cache
+        logger.info("Pre-fetching token prices...")
+        try:
+            # Fetch prices for major tokens
+            await self.base_client.get_token_price_usd(TOKENS["WETH"])
+            await self.base_client.get_token_price_usd(TOKENS["AERO"])
+            # USDC, DAI, USDbC are stablecoins, will be cached as $1
+            await self.base_client.get_token_price_usd(TOKENS["USDC"])
+            await self.base_client.get_token_price_usd(TOKENS["DAI"])
+            await self.base_client.get_token_price_usd(TOKENS["USDbC"])
+            logger.info("Token prices cached successfully")
+        except Exception as e:
+            logger.error(f"Error pre-fetching token prices: {e}")
+        
         # Initialize gauge reader and event monitor if needed
         if not self.gauge_reader:
             from src.blockchain.rpc_reader import RPCReader
@@ -329,6 +343,39 @@ class PoolScanner:
         # Get thresholds from settings or use defaults
         min_apr_for_memory = getattr(settings, 'min_apr_for_memory', 20)
         min_volume_for_memory = getattr(settings, 'min_volume_for_memory', 100000)
+        
+        # First, store ALL pools that meet basic criteria (not just categorized opportunities)
+        # This ensures we don't miss pools with APR between 20-50%
+        for pool_key, pool_data in self.pools.items():
+            # Store any pool with meaningful APR or volume
+            if pool_data.get("apr", 0) >= min_apr_for_memory or pool_data.get("volume_24h", 0) >= min_volume_for_memory:
+                # Create consistent observation structure
+                observation = {
+                    "type": "observation",
+                    "category": "pool_analysis",  # Use general category
+                    "timestamp": pool_data.get("timestamp", datetime.utcnow()).isoformat() if isinstance(pool_data.get("timestamp"), datetime) else pool_data.get("timestamp"),
+                    "confidence": 0.8,
+                    "pool": pool_data["pair"],
+                    "pool_address": pool_data.get("address"),
+                    "tvl": float(pool_data.get("tvl", 0)),
+                    "apr": float(pool_data.get("apr", 0)),
+                    "fee_apr": float(pool_data.get("fee_apr", 0)),
+                    "incentive_apr": float(pool_data.get("incentive_apr", 0)),
+                    "volume_24h": float(pool_data.get("volume_24h", 0)),
+                    "stable": pool_data.get("stable", False),
+                    "imbalanced": pool_data.get("imbalanced", False),
+                    "ratio": float(pool_data.get("ratio", 1)),
+                    "reserves": {k: float(v) for k, v in pool_data.get("reserves", {}).items()},
+                }
+                
+                await self.memory.remember(
+                    content=f"Pool analysis: {pool_data['pair']} - APR: {pool_data.get('apr', 0):.2f}%, Volume: ${pool_data.get('volume_24h', 0):,.0f}, TVL: ${pool_data.get('tvl', 0):,.0f}",
+                    memory_type=MemoryType.OBSERVATION,
+                    category="pool_analysis",
+                    metadata=observation,
+                    confidence=observation["confidence"]
+                )
+                logger.info(f"Stored pool data for {pool_data['pair']} with APR {pool_data.get('apr', 0):.2f}%")
         
         # Store ALL high APR pools, not just the top one
         if opportunities["high_apr"]:

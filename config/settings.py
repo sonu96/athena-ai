@@ -223,6 +223,7 @@ MEMORY_CATEGORIES = [
     "gas_optimization",
     "strategy_performance",
     "pool_behavior",
+    "pool_analysis",        # General pool data and metrics
     "user_preference",
     "error_learning",
     "profit_source",
