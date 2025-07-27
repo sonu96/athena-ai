@@ -3,11 +3,12 @@ import asyncio
 import logging
 import os
 from datetime import datetime, timedelta
-from src.agent.core import AthenaAgent
+from src.agent.core_new import AthenaAgent
 from src.agent.memory import AthenaMemory
-from src.cdp.base_client import BaseClient
+from src.mcp.quicknode_mcp import QuickNodeMCP
+from src.agentkit.agent_client import AthenaAgentKit
 from src.collectors.gas_monitor import GasMonitor
-from src.collectors.pool_scanner import PoolScanner
+from src.collectors.pool_scanner_new import PoolScanner
 from src.gcp.firestore_client import FirestoreClient
 from config.settings import settings
 
@@ -20,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 
 async def main():
-    print("🚀 Initializing Athena AI...")
+    print("🚀 Initializing Athena AI with MCP & AgentKit...")
     print(f"🧠 I am learning 24/7 to maximize DeFi profits on Aerodrome")
     
     # Check observation mode
@@ -39,25 +40,32 @@ async def main():
     
     # Initialize components
     memory = AthenaMemory()
-    base_client = BaseClient()
     firestore = FirestoreClient(settings.gcp_project_id)
     
-    # Initialize CDP client
-    await base_client.initialize()
-    print(f"💳 Wallet address: {base_client.address}")
+    # Initialize QuickNode MCP
+    mcp = QuickNodeMCP(settings.quicknode_api_key)
+    await mcp.initialize()
+    print("✅ QuickNode MCP initialized")
+    
+    # Initialize AgentKit
+    agentkit = AthenaAgentKit()
+    await agentkit.initialize()
+    print(f"💳 Wallet address: {agentkit.address}")
     
     # Create agent
-    agent = AthenaAgent(memory, base_client, firestore)
+    agent = AthenaAgent(memory, firestore)
     
-    # Start collectors
-    gas_monitor = GasMonitor(base_client, memory)
-    pool_scanner = PoolScanner(base_client, memory)
+    # Initialize agent's blockchain clients
+    await agent.agentkit.initialize()
+    
+    # Start collectors with MCP
+    # Note: GasMonitor will be updated to use MCP in next iteration
+    pool_scanner = PoolScanner(mcp, memory)
     
     print("👀 Starting 24/7 monitoring...")
     print("📊 Tracking gas prices, pool APRs, and market opportunities")
     
     # Run collectors in background
-    asyncio.create_task(gas_monitor.start_monitoring())
     asyncio.create_task(pool_scanner.start_scanning())
     
     # Run agent reasoning loop
@@ -76,7 +84,9 @@ async def main():
                 "memories": [],
                 "decisions": [],
                 "next_action": "",
-                "messages": []
+                "messages": [],
+                "rebalance_recommendations": [],
+                "compound_recommendations": []
             }
             
             # Execute workflow
@@ -99,45 +109,26 @@ async def main():
                 'observation_mode': agent._is_observation_mode()
             })
             
-            firestore.update_performance(agent.performance)
-            
-            # Track observation metrics
-            if agent._is_observation_mode():
-                firestore.save_observation_metrics({
-                    'patterns_discovered': len(agent.patterns_discovered),
-                    'cycles_completed': cycle_count,
-                    'unique_theories': len(set(result.get('theories', []))),
-                    'observations_collected': len(result.get('observations', [])),
-                    'start_time': agent.observation_start.isoformat(),
-                    'days_observed': (datetime.utcnow() - agent.observation_start).days
-                })
-            
-            # Log results
             logger.info(f"✅ Cycle #{cycle_count} complete")
             logger.info(f"🎭 Emotional state: {agent.emotions}")
-            
-            if agent._is_observation_mode():
-                logger.info(f"📊 Patterns discovered: {len(agent.patterns_discovered)}")
-                # Check if transitioning soon
-                observation_end = agent.observation_start + timedelta(days=settings.observation_days)
-                remaining = observation_end - datetime.utcnow()
-                if remaining.total_seconds() < 3600:  # Less than 1 hour
-                    logger.info("⚡ Observation period ending soon - preparing for trading!")
-                    # Load high confidence patterns
-                    high_conf_patterns = firestore.get_high_confidence_patterns(settings.min_pattern_confidence)
-                    logger.info(f"🎯 Found {len(high_conf_patterns)} high-confidence patterns")
-            else:
-                logger.info(f"💰 Total profit: ${agent.performance['total_profit']}")
+            logger.info(f"💰 Total profit: ${agent.performance['total_profit']}")
             
         except Exception as e:
             logger.error(f"Error in cycle #{cycle_count}: {e}")
             
         # Wait before next reasoning cycle
         await asyncio.sleep(settings.agent_cycle_time)
+    
+    # Cleanup
+    await mcp.close()
 
 
 if __name__ == "__main__":
     try:
+        print("=" * 60)
+        print("ATHENA AI - 24/7 DeFi Agent")
+        print("Powered by QuickNode MCP & Coinbase AgentKit")
+        print("=" * 60)
         asyncio.run(main())
     except KeyboardInterrupt:
         print("\n👋 Athena AI shutting down gracefully...")

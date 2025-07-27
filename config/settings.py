@@ -148,6 +148,13 @@ class Settings(BaseSettings):
     agent_max_position_size: float = Field(default=1000.0, env="AGENT_MAX_POSITION_SIZE")  # USD
     agent_risk_limit: float = Field(default=0.02, env="AGENT_RISK_LIMIT")  # 2% max loss
     
+    # Rebalancing Configuration
+    rebalance_min_apr_threshold: float = Field(default=20.0, env="REBALANCE_MIN_APR")  # Min acceptable APR
+    rebalance_apr_drop_trigger: float = Field(default=30.0, env="REBALANCE_APR_DROP_TRIGGER")  # Trigger if APR drops by %
+    rebalance_cost_multiplier: float = Field(default=2.0, env="REBALANCE_COST_MULTIPLIER")  # Expected gain must be X times cost
+    compound_min_value: float = Field(default=50.0, env="COMPOUND_MIN_VALUE")  # Min rewards value to compound
+    compound_optimal_gas: float = Field(default=30.0, env="COMPOUND_OPTIMAL_GAS")  # Max gas for profitable compound
+    
     # Observation Mode Configuration
     observation_mode: bool = Field(default=True, env="OBSERVATION_MODE")  # Start in observation mode
     observation_days: int = Field(default=3, env="OBSERVATION_DAYS")  # Days to observe before trading
@@ -159,6 +166,23 @@ class Settings(BaseSettings):
     min_volume_for_memory: int = Field(default=100000, env="MIN_VOLUME_FOR_MEMORY")  # Store pools with volume >= $100k
     max_memories_per_cycle: int = Field(default=50, env="MAX_MEMORIES_PER_CYCLE")  # Prevent memory overflow
     pool_profile_update_interval: int = Field(default=3600, env="POOL_PROFILE_UPDATE_INTERVAL")  # Update profiles every hour
+    
+    # QuickNode API Configuration
+    quicknode_api_key: Optional[str] = Field(None, env="QUICKNODE_API_KEY")
+    quicknode_endpoint: Optional[str] = Field(None, env="QUICKNODE_ENDPOINT")
+    
+    @validator("quicknode_api_key", pre=False, always=True)
+    def load_quicknode_api_key(cls, v, values):
+        if v:
+            return v
+        # Load from Secret Manager if not in env
+        if "gcp_project_id" in values:
+            try:
+                from src.gcp.secret_manager import get_secret
+                return get_secret("quicknode-api-key", "QUICKNODE_API_KEY")
+            except:
+                return None  # QuickNode is optional
+        return v
     
     # API Configuration
     api_port: int = Field(default=8000, env="API_PORT")
@@ -233,6 +257,15 @@ MEMORY_CATEGORIES = [
     "new_pool",             # New pool discoveries
     "apr_anomaly",          # Unusual APR changes
     "fee_collection",       # Fee event tracking
+    # Rebalancing patterns
+    "apr_degradation_patterns",  # How APRs decay over time
+    "gas_optimization_windows",  # Best times for transactions
+    "compound_roi_patterns",     # Optimal compounding frequency
+    "pool_lifecycle_patterns",   # New pool behavior, TVL impact
+    "rebalance_success_metrics", # Learn from past rebalances
+    "tvl_impact_patterns",       # How TVL affects APR
+    "rebalance_timing",          # Optimal times to rebalance
+    "compound_threshold",        # Min rewards to compound
 ]
 
 

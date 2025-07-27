@@ -1,0 +1,12 @@
+{
+  "name": "athena-ai-mcp",
+  "version": "1.0.0",
+  "description": "QuickNode MCP integration for Athena AI",
+  "scripts": {
+    "install-mcp": "npm install -g @quicknode/mcp",
+    "start-mcp": "npx @quicknode/mcp"
+  },
+  "dependencies": {
+    "@quicknode/mcp": "latest"
+  }
+}

@@ -1,5 +1,5 @@
 # Core AI/ML dependencies
-cdp-sdk
+cdp-agentkit-core
 langgraph==0.2.0
 langsmith>=0.1.17
 mem0ai==0.0.20

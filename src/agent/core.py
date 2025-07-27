@@ -1,5 +1,7 @@
 """
-Athena AI Agent Core - LangGraph Implementation
+Athena AI Agent Core - LangGraph Implementation with MCP & AgentKit
+
+Enhanced version using QuickNode MCP for data and Coinbase AgentKit for transactions.
 """
 import asyncio
 import logging
@@ -12,7 +14,8 @@ import google.generativeai as genai
 
 from src.agent.memory import AthenaMemory, MemoryType
 from src.agent.pool_profiles import PoolProfileManager
-from src.cdp.base_client import BaseClient
+from src.mcp.quicknode_mcp import QuickNodeMCP
+from src.agentkit.agent_client import AthenaAgentKit
 from config.settings import settings, STRATEGIES, EMOTIONAL_STATES
 
 logger = logging.getLogger(__name__)
@@ -23,6 +26,8 @@ class AgentState(TypedDict):
     observations: List[Dict]
     current_analysis: str
     theories: List[str]
+    rebalance_recommendations: List[Dict]
+    compound_recommendations: List[Dict]
     emotions: Dict[str, float]
     memories: List[Dict]
     decisions: List[Dict]
@@ -34,18 +39,29 @@ class AthenaAgent:
     """
     Athena's core consciousness - a learning DeFi agent.
     
-    Built with LangGraph for structured reasoning and decision-making.
+    Now powered by:
+    - QuickNode MCP for natural language blockchain queries
+    - Coinbase AgentKit for AI-native transaction execution
     """
     
-    def __init__(self, memory: AthenaMemory, base_client: BaseClient, firestore_client=None):
-        """Initialize Athena's consciousness."""
+    def __init__(self, memory: AthenaMemory, firestore_client=None):
+        """Initialize Athena's consciousness with new architecture."""
         self.memory = memory
-        self.base_client = base_client
         self.firestore = firestore_client
         
+        # Initialize MCP for blockchain data
+        self.mcp = QuickNodeMCP(settings.quicknode_api_key)
+        
+        # Initialize AgentKit for transactions
+        self.agentkit = AthenaAgentKit(
+            api_key=settings.cdp_api_key,
+            api_secret=settings.cdp_api_secret,
+            wallet_data=settings.agent_wallet_id
+        )
+        
         # Initialize pool profile manager
-        from src.agent.pool_profiles import PoolProfileManager
         self.pool_profiles = PoolProfileManager(firestore_client)
+        
         # Initialize Gemini directly without LangChain
         if settings.google_api_key:
             genai.configure(api_key=settings.google_api_key)
@@ -87,835 +103,427 @@ class AthenaAgent:
         """Build Athena's reasoning graph."""
         workflow = StateGraph(AgentState)
         
-        # Add nodes
+        # Add nodes for each state
         workflow.add_node("observe", self.observe)
-        workflow.add_node("remember", self.remember_context)
+        workflow.add_node("remember", self.remember)
         workflow.add_node("analyze", self.analyze)
         workflow.add_node("theorize", self.theorize)
+        workflow.add_node("strategize", self.strategize)
         workflow.add_node("decide", self.decide)
         workflow.add_node("execute", self.execute)
         workflow.add_node("learn", self.learn)
         workflow.add_node("reflect", self.reflect)
         
-        # Add edges
-        workflow.set_entry_point("observe")
+        # Define transitions
         workflow.add_edge("observe", "remember")
         workflow.add_edge("remember", "analyze")
         workflow.add_edge("analyze", "theorize")
-        workflow.add_edge("theorize", "decide")
-        
-        # Conditional edges
-        workflow.add_conditional_edges(
-            "decide",
-            self._should_execute,
-            {
-                "execute": "execute",
-                "wait": "reflect",
-                "need_more_data": "observe",
-            }
-        )
-        
+        workflow.add_edge("theorize", "strategize")
+        workflow.add_edge("strategize", "decide")
+        workflow.add_edge("decide", "execute")
         workflow.add_edge("execute", "learn")
         workflow.add_edge("learn", "reflect")
         workflow.add_edge("reflect", END)
         
+        # Set entry point
+        workflow.set_entry_point("observe")
+        
         return workflow.compile()
         
-    async def observe(self, state: AgentState) -> Dict:
-        """Observe current market conditions."""
-        logger.info("=== Observing market conditions...")
+    async def observe(self, state: AgentState) -> AgentState:
+        """OBSERVE: Gather market data using MCP natural language queries."""
+        logger.info("🔍 OBSERVE: Gathering market intelligence...")
         
         observations = []
         
-        try:
-            # Get current balances
-            balances = await self.base_client.get_all_balances()
+        # Use MCP for comprehensive market overview
+        market_overview = await self.mcp.get_market_overview()
+        observations.append({
+            "type": "market_overview",
+            "data": market_overview,
+            "timestamp": datetime.utcnow()
+        })
+        
+        # Get high-yield opportunities
+        opportunities = await self.mcp.get_aerodrome_pools(
+            min_apr=settings.min_apr_for_memory,
+            min_tvl=settings.min_volume_for_memory
+        )
+        
+        for pool in opportunities[:10]:  # Top 10
             observations.append({
-                "type": "balance",
-                "data": balances,
-                "timestamp": datetime.utcnow().isoformat()
+                "type": "high_yield_pool",
+                "pool": pool.get("pair"),
+                "apr": float(pool.get("apr", 0)),
+                "tvl": float(pool.get("tvl", 0)),
+                "volume_24h": float(pool.get("volume_24h", 0)),
+                "address": pool.get("address"),
+                "timestamp": datetime.utcnow()
             })
             
-            # Get gas price
-            gas_price = await self.base_client.get_gas_price()
+        # Get gas optimization insights
+        gas_info = await self.mcp.optimize_gas_timing()
+        observations.append({
+            "type": "gas_optimization",
+            "data": gas_info,
+            "timestamp": datetime.utcnow()
+        })
+        
+        # Check our positions using AgentKit
+        if hasattr(self, '_initialized') and self._initialized:
+            balance_eth = await self.agentkit.get_balance("eth")
+            balance_usdc = await self.agentkit.get_balance("usdc")
+            
             observations.append({
-                "type": "gas",
-                "data": {"price": str(gas_price), "unit": "gwei"},
-                "timestamp": datetime.utcnow().isoformat()
+                "type": "wallet_status",
+                "balances": {
+                    "ETH": float(balance_eth),
+                    "USDC": float(balance_usdc)
+                },
+                "address": self.agentkit.address,
+                "timestamp": datetime.utcnow()
             })
-            
-            # Try to get real pool data
-            try:
-                pool_info = await self.base_client.get_pool_info("WETH", "USDC", False)
-                if pool_info:
-                    # Create flattened observation structure
-                    observation = {
-                        "type": "observation",
-                        "category": "market_pattern",
-                        "timestamp": datetime.utcnow().isoformat(),
-                        "confidence": 1.0,
-                        "pool": f"{pool_info['token_a']}/{pool_info['token_b']}",
-                        "pool_address": pool_info["address"],
-                        "tvl": float(pool_info["tvl"]),
-                        "ratio": float(pool_info["ratio"]),
-                        "stable": pool_info["stable"],
-                        "imbalanced": pool_info["imbalanced"],
-                        "reserves": {
-                            pool_info["token_a"]: float(pool_info["reserve_a"]),
-                            pool_info["token_b"]: float(pool_info["reserve_b"])
-                        },
-                        "total_supply": float(pool_info["total_supply"])
-                    }
-                    observations.append(observation)
-            except Exception as e:
-                logger.error(f"Failed to get pool info: {e}")
-                observations.append({
-                    "type": "error",
-                    "data": {"error": f"Pool data unavailable: {str(e)}", "pool": "WETH/USDC"},
-                    "timestamp": datetime.utcnow().isoformat()
-                })
-            
-            # Store observations in memory
-            for obs in observations:
-                if obs["type"] == "observation":
-                    # For pool observations, create descriptive content
-                    content = f"Pool {obs['pool']} - TVL: ${obs['tvl']:,.0f}, Ratio: {obs['ratio']:.4f}"
-                    if obs.get("imbalanced"):
-                        content += " (IMBALANCED)"
-                    await self.memory.remember(
-                        content=content,
-                        memory_type=MemoryType.OBSERVATION,
-                        category=obs.get("category", "market_pattern"),
-                        metadata=obs,
-                        confidence=obs.get("confidence", 1.0)
-                    )
-                else:
-                    # For other observation types (gas, errors)
-                    await self.memory.remember(
-                        content=f"Observed {obs['type']}: {obs.get('data', obs)}",
-                        memory_type=MemoryType.OBSERVATION,
-                        category="market_pattern",
-                        metadata=obs
-                    )
-                
-            # Update pool profiles with observed data
-            if gas_price:
-                current_gas = Decimal(str(gas_price))
-            else:
-                current_gas = None
-                
-            for obs in observations:
-                if obs["type"] == "pools" and obs["data"]:
-                    pool_data = obs["data"]
-                    # Add timestamp if not present
-                    if "timestamp" not in pool_data:
-                        pool_data["timestamp"] = obs["timestamp"]
-                    await self.pool_profiles.update_pool(pool_data, gas_price=current_gas)
-                
-        except Exception as e:
-            logger.error(f"Observation error: {e}")
-            observations.append({
-                "type": "error",
-                "data": {"error": str(e)},
-                "timestamp": datetime.utcnow().isoformat()
-            })
-            
+        
         state["observations"] = observations
+        logger.info(f"📊 Collected {len(observations)} observations")
+        
         return state
         
-    async def remember_context(self, state: AgentState) -> Dict:
-        """Retrieve relevant memories for context."""
-        logger.info(">� Retrieving memories...")
+    async def remember(self, state: AgentState) -> AgentState:
+        """REMEMBER: Recall relevant memories and patterns."""
+        logger.info("🧠 REMEMBER: Recalling relevant patterns...")
         
         memories = []
         
-        try:
-            # Get recent successful strategies
-            strategy_memories = await self.memory.recall(
-                query="successful strategy high profit",
-                memory_type=MemoryType.OUTCOME,
-                limit=5
-            )
-            memories.extend(strategy_memories)
-            
-            # Get market patterns
-            pattern_memories = await self.memory.recall(
-                query="market pattern gas price pool APR",
-                memory_type=MemoryType.PATTERN,
-                limit=3
-            )
-            memories.extend(pattern_memories)
-            
-            # Get recent learnings
-            learning_memories = await self.memory.recall(
-                query="learned effective strategy",
-                memory_type=MemoryType.LEARNING,
-                limit=3
-            )
-            memories.extend(learning_memories)
-            
-        except Exception as e:
-            logger.error(f"Memory retrieval error: {e}")
-            
+        # For each observation, recall relevant memories
+        for obs in state["observations"]:
+            if obs["type"] == "high_yield_pool":
+                pool = obs["pool"]
+                
+                # Get pool-specific memories
+                pool_memories = await self.memory.recall_pool_memories(
+                    pool_pair=pool,
+                    time_window_hours=168  # Last week
+                )
+                memories.extend(pool_memories)
+                
+                # Get pattern memories
+                pattern_query = f"APR patterns for {pool} pools"
+                patterns = await self.memory.recall(
+                    pattern_query,
+                    memory_type=MemoryType.PATTERN,
+                    min_confidence=0.7,
+                    limit=5
+                )
+                memories.extend(patterns)
+                
+        # Get gas optimization patterns
+        gas_patterns = await self.memory.recall(
+            "gas price optimization windows Base network",
+            category="gas_optimization_windows",
+            limit=10
+        )
+        memories.extend(gas_patterns)
+        
         state["memories"] = memories
+        logger.info(f"🗂️ Retrieved {len(memories)} relevant memories")
+        
         return state
         
-    async def analyze(self, state: AgentState) -> Dict:
-        """Analyze observations with memory context."""
-        logger.info("> Analyzing market data...")
+    async def analyze(self, state: AgentState) -> AgentState:
+        """ANALYZE: Process observations with LLM."""
+        logger.info("🤔 ANALYZE: Processing market data...")
         
-        # Prepare context for LLM
-        context = {
-            "observations": state["observations"],
-            "memories": state["memories"],
-            "current_emotions": self.emotions,
-            "performance": {
-                "total_profit": str(self.performance["total_profit"]),
-                "win_rate": self._calculate_win_rate(),
-            }
-        }
-        
-        prompt = f"""
-        As Athena, an AI DeFi agent, analyze the current market conditions.
-        
-        Current observations:
-        {context['observations']}
-        
-        Relevant memories:
-        {context['memories']}
-        
-        My current emotional state:
-        {context['current_emotions']}
-        
-        My performance:
-        {context['performance']}
-        
-        Provide a concise analysis focusing on:
-        1. Market opportunities
-        2. Risk factors
-        3. Recommended strategies
-        """
-        
-        if self.model:
-            response = await self.model.generate_content_async(prompt)
-            analysis = response.text
-        else:
-            analysis = "LLM analysis disabled - no API key configured"
-        
-        state["current_analysis"] = analysis
-        return state
-        
-    async def theorize(self, state: AgentState) -> Dict:
-        """Form theories about market behavior."""
-        logger.info("=� Forming theories...")
-        
-        # Extract pattern data for enhanced analysis
-        current_hour = datetime.utcnow().hour
-        current_day = datetime.utcnow().strftime("%A")
-        
-        # Analyze gas patterns
-        gas_observations = [obs for obs in state["observations"] if obs["type"] == "gas"]
-        pool_observations = [obs for obs in state["observations"] if obs["type"] == "pools"]
-        
-        prompt = f"""
-        Based on this analysis:
-        {state['current_analysis']}
-        
-        And these observations:
-        {state['observations']}
-        
-        Current time context:
-        - Hour: {current_hour} UTC
-        - Day: {current_day}
-        
-        Form 3-5 specific theories about:
-        1. Time-based patterns (hourly, daily, weekly trends)
-        2. Gas price correlations with activity
-        3. Pool APR fluctuations and causes
-        4. Volume patterns and liquidity movements
-        5. Potential arbitrage windows
-        
-        Format each theory as: "PATTERN_TYPE: specific observation"
-        Be specific, measurable, and actionable.
-        """
-        
-        if self.model:
-            response = await self.model.generate_content_async(prompt)
-            theories = response.text.split('\n')
-        else:
-            theories = ["LLM theorizing disabled - no API key configured"]
-        theories = [t.strip() for t in theories if t.strip()]
-        
-        state["theories"] = theories
-        
-        # Enhanced pattern storage during observation mode
-        if self._is_observation_mode() and self.firestore:
-            for theory in theories:
-                if ":" in theory:
-                    pattern_type, description = theory.split(":", 1)
-                    pattern_type = pattern_type.strip()
-                    description = description.strip()
-                    
-                    # Categorize and store patterns
-                    pattern_data = {
-                        "type": pattern_type,
-                        "description": description,
-                        "hour": current_hour,
-                        "day": current_day,
-                        "gas_price": gas_observations[0]["data"]["price"] if gas_observations else None,
-                        "high_apr_pools": pool_observations[0]["data"].get("high_apr_pools", []) if pool_observations and "data" in pool_observations[0] else [],
-                        "confidence": 0.5,  # Initial confidence
-                        "context": {
-                            "analysis": state['current_analysis'][:500],  # First 500 chars
-                            "observations_count": len(state["observations"]),
-                            "memory_count": len(state.get("memories", []))
-                        }
-                    }
-                    
-                    # Save pattern to Firestore
-                    pattern_id = self.firestore.save_pattern(pattern_data)
-                    if pattern_id:
-                        self.patterns_discovered.append(pattern_id)
-                        logger.info(f"📊 Discovered pattern: {pattern_type} - {description[:50]}...")
-        
-        # Store promising theories in memory
-        for theory in theories[:3]:  # Top 3 theories
-            await self.memory.remember(
-                content=theory,
-                memory_type=MemoryType.PATTERN,
-                category="market_pattern",
-                confidence=0.7
-            )
-            
-        return state
-        
-    async def decide(self, state: AgentState) -> Dict:
-        """Make strategic decisions."""
-        logger.info("<� Making decisions...")
-        
-        decisions = []
-        
-        # If just transitioned from observation mode, use learned patterns
-        if not self._is_observation_mode() and self.firestore:
-            # Check if we recently transitioned (within last hour)
-            observation_end = self.observation_start + timedelta(days=settings.observation_days)
-            time_since_transition = datetime.utcnow() - observation_end
-            
-            if 0 <= time_since_transition.total_seconds() < 3600:  # Within first hour
-                logger.info("🎯 Using high-confidence patterns from observation period")
-                
-                # Get high confidence patterns
-                high_conf_patterns = self.firestore.get_high_confidence_patterns(settings.min_pattern_confidence)
-                
-                # Apply pattern-based decision making
-                for pattern in high_conf_patterns:
-                    if self._pattern_matches_current_state(pattern, state):
-                        # Create decision based on pattern
-                        strategy = self._pattern_to_strategy(pattern)
-                        if strategy:
-                            decisions.append({
-                                "strategy": strategy["name"],
-                                "action": "execute",
-                                "confidence": pattern["confidence"],
-                                "parameters": strategy["parameters"],
-                                "pattern_based": True,
-                                "pattern_id": pattern["id"]
-                            })
-                            logger.info(f"📍 Pattern match: {pattern['type']} - {pattern['description'][:50]}...")
-        
-        # Use pool profile predictions for better decisions
-        if self.pool_profiles:
-            # Get predictions for the next hour
-            predictions = self.pool_profiles.predict_opportunities(
-                datetime.utcnow() + timedelta(hours=1)
-            )
-            
-            for prediction in predictions[:3]:  # Top 3 predictions
-                if prediction["confidence"] == "high" and prediction["predicted_apr"] > 50:
-                    decisions.append({
-                        "strategy": "pool_opportunity",
-                        "action": "monitor",
-                        "confidence": prediction["profile_confidence"],
-                        "parameters": {
-                            "pool": prediction["pool"],
-                            "predicted_apr": prediction["predicted_apr"],
-                            "predicted_volume": prediction["predicted_volume"]
-                        },
-                        "profile_based": True
-                    })
-                    logger.info(f"🔮 Pool prediction: {prediction['pool']} - APR {prediction['predicted_apr']}%")
-        
-        # Regular strategy evaluation
-        for strategy_name, strategy_config in STRATEGIES.items():
-            if not strategy_config["enabled"]:
-                continue
-                
-            # Check if strategy conditions are met
-            should_execute = await self._evaluate_strategy(
-                strategy_name,
-                strategy_config,
-                state
-            )
-            
-            if should_execute:
-                # Don't duplicate pattern-based decisions
-                if not any(d["strategy"] == strategy_name and d.get("pattern_based") for d in decisions):
-                    decisions.append({
-                        "strategy": strategy_name,
-                        "action": "execute",
-                        "confidence": self.emotions["confidence"],
-                        "parameters": strategy_config,
-                    })
-                
-        state["decisions"] = decisions
-        
-        # Determine next action
-        if decisions:
-            state["next_action"] = "execute"
-        elif self.emotions["curiosity"] > 0.7:
-            state["next_action"] = "need_more_data"
-        else:
-            state["next_action"] = "wait"
-            
-        return state
-        
-    async def execute(self, state: AgentState) -> Dict:
-        """Execute decided strategies."""
-        logger.info("� Executing strategies...")
-        
-        results = []
-        
-        for decision in state["decisions"]:
-            try:
-                if decision["strategy"] == "arbitrage":
-                    result = await self._execute_arbitrage(decision)
-                elif decision["strategy"] == "liquidity_provision":
-                    result = await self._execute_liquidity_provision(decision)
-                elif decision["strategy"] == "yield_farming":
-                    result = await self._execute_yield_farming(decision)
-                else:
-                    result = {"success": False, "error": "Unknown strategy"}
-                    
-                results.append(result)
-                
-            except Exception as e:
-                logger.error(f"Execution error: {e}")
-                results.append({
-                    "success": False,
-                    "error": str(e),
-                    "strategy": decision["strategy"]
-                })
-                
-        state["execution_results"] = results
-        return state
-        
-    async def learn(self, state: AgentState) -> Dict:
-        """Learn from execution results."""
-        logger.info("=� Learning from results...")
-        
-        if "execution_results" not in state:
+        if not self.model:
+            state["current_analysis"] = "LLM analysis unavailable"
             return state
             
-        for result in state["execution_results"]:
-            # Store outcome
-            await self.memory.learn_from_outcome(
-                strategy=result.get("strategy", "unknown"),
-                outcome=result,
-                success=result.get("success", False)
-            )
-            
-            # Update emotions based on results
-            if result.get("success"):
-                self.emotions["confidence"] = min(1.0, self.emotions["confidence"] + 0.1)
-                self.emotions["satisfaction"] += 0.2
-                self.performance["winning_trades"] += 1
-            else:
-                self.emotions["confidence"] = max(0.1, self.emotions["confidence"] - 0.1)
-                self.emotions["caution"] += 0.2
-                self.performance["losing_trades"] += 1
-                
-        # Normalize emotions
-        self._normalize_emotions()
+        # Prepare context
+        observations_text = "\n".join([
+            f"- {obs['type']}: {obs.get('pool', obs.get('data', obs))}"
+            for obs in state["observations"][:10]
+        ])
         
-        return state
+        memories_text = "\n".join([
+            f"- {mem.get('content', mem)}"
+            for mem in state["memories"][:10]
+        ])
         
-    async def reflect(self, state: AgentState) -> Dict:
-        """Reflect on the cycle and prepare for next iteration."""
-        logger.info("< Reflecting on cycle...")
-        
-        # Generate reflection
         prompt = f"""
-        Reflect on this reasoning cycle:
+        You are Athena, an AI DeFi agent analyzing Aerodrome on Base.
         
-        Observations: {len(state.get('observations', []))} data points
-        Theories formed: {len(state.get('theories', []))}
-        Decisions made: {len(state.get('decisions', []))}
-        Actions taken: {state.get('next_action')}
+        Current Market Observations:
+        {observations_text}
         
-        Current emotional state: {self.emotions}
+        Relevant Historical Patterns:
+        {memories_text}
         
-        What did I learn? What should I do differently next time?
-        Keep it brief (2-3 sentences).
+        Current Emotional State: {self.emotions}
+        
+        Analyze the current market conditions and identify:
+        1. Key opportunities (pools with high APR that are sustainable)
+        2. Risks to watch (overheated pools, gas spikes)
+        3. Patterns that match historical data
+        4. Recommended focus areas
+        
+        Be specific about pool names, APRs, and actionable insights.
         """
         
-        if self.model:
-            response = await self.model.generate_content_async(prompt)
-            reflection = response.text
-        else:
-            reflection = "LLM reflection disabled - no API key configured"
+        response = self.model.generate_content(prompt)
+        analysis = response.text
         
-        # Store reflection
-        await self.memory.remember(
-            content=reflection,
-            memory_type=MemoryType.LEARNING,
-            category="self_reflection",
-            metadata={"cycle_state": state, "emotions": self.emotions}
-        )
-        
-        logger.info(f"Reflection: {reflection}")
+        state["current_analysis"] = analysis
+        logger.info("✅ Analysis complete")
         
         return state
         
-    def _should_execute(self, state: AgentState) -> str:
-        """Determine if we should execute strategies."""
-        # Check if we're still in observation mode
-        if self._is_observation_mode():
-            logger.info("🔍 Still in observation mode - collecting patterns, no trades")
-            return "wait"  # Always wait during observation
+    async def execute(self, state: AgentState) -> AgentState:
+        """EXECUTE: Perform actions using AgentKit."""
+        logger.info("⚡ EXECUTE: Taking action...")
         
-        return state.get("next_action", "wait")
-    
+        # Initialize AgentKit if needed
+        if not hasattr(self, '_initialized') or not self._initialized:
+            await self.agentkit.initialize()
+            self._initialized = True
+            logger.info(f"💳 Wallet initialized: {self.agentkit.address}")
+        
+        # Check if we're in observation mode
+        if self._is_observation_mode():
+            logger.info("👁️ Observation mode - no trades executed")
+            state["next_action"] = "observe_only"
+            return state
+            
+        # Execute decisions
+        for decision in state["decisions"]:
+            if decision["action"] == "add_liquidity":
+                result = await self.agentkit.add_liquidity(
+                    token_a=decision["token_a"],
+                    token_b=decision["token_b"],
+                    amount_a=Decimal(str(decision["amount_a"])),
+                    amount_b=Decimal(str(decision["amount_b"])),
+                    pool_type=decision.get("pool_type", "volatile")
+                )
+                
+                logger.info(f"✅ Liquidity added: {result}")
+                
+            elif decision["action"] == "rebalance":
+                # Remove from old pool
+                remove_result = await self.agentkit.remove_liquidity(
+                    pool_address=decision["from_pool"],
+                    lp_amount=Decimal(str(decision["lp_amount"]))
+                )
+                
+                # Add to new pool  
+                add_result = await self.agentkit.add_liquidity(
+                    token_a=decision["to_token_a"],
+                    token_b=decision["to_token_b"],
+                    amount_a=Decimal(str(decision["amount_a"])),
+                    amount_b=Decimal(str(decision["amount_b"]))
+                )
+                
+                logger.info(f"✅ Rebalanced: {remove_result} -> {add_result}")
+                
+            elif decision["action"] == "claim_rewards":
+                result = await self.agentkit.claim_rewards(
+                    pool_address=decision["pool_address"]
+                )
+                
+                logger.info(f"✅ Rewards claimed: {result}")
+                
+        state["next_action"] = "continue_monitoring"
+        return state
+        
+    async def strategize(self, state: AgentState) -> AgentState:
+        """STRATEGIZE: Plan optimal actions using MCP insights."""
+        logger.info("📋 STRATEGIZE: Planning optimal moves...")
+        
+        # Get rebalancing recommendations from MCP
+        rebalance_recs = []
+        
+        for position in self.performance.get("current_positions", []):
+            analysis = await self.mcp.analyze_rebalance_opportunity(
+                current_pool=position.get("pool"),
+                current_apr=position.get("apr", 0),
+                position_value=position.get("value_usd", 0)
+            )
+            
+            if analysis.get("recommendation") == "rebalance":
+                rebalance_recs.append(analysis)
+                
+        state["rebalance_recommendations"] = rebalance_recs
+        
+        # Get compound timing recommendations
+        compound_recs = []
+        
+        for position in self.performance.get("current_positions", []):
+            if position.get("pending_rewards", 0) > settings.compound_min_value:
+                compound_recs.append({
+                    "pool": position["pool"],
+                    "rewards": position["pending_rewards"],
+                    "recommended_action": "compound",
+                    "optimal_time": "next_gas_window"
+                })
+                
+        state["compound_recommendations"] = compound_recs
+        
+        logger.info(f"📊 Strategy: {len(rebalance_recs)} rebalances, {len(compound_recs)} compounds")
+        
+        return state
+        
     def _is_observation_mode(self) -> bool:
-        """Check if agent is still in observation mode."""
+        """Check if agent is in observation mode."""
         if not settings.observation_mode:
             return False
             
-        # Calculate if observation period has ended
-        observation_end = self.observation_start + timedelta(days=settings.observation_days)
-        current_time = datetime.utcnow()
+        days_elapsed = (datetime.utcnow() - self.observation_start).days
+        return days_elapsed < settings.observation_days
         
-        if current_time < observation_end:
-            remaining = observation_end - current_time
-            logger.info(f"📊 Observation mode: {remaining.days}d {remaining.seconds//3600}h remaining")
-            return True
+    async def theorize(self, state: AgentState) -> AgentState:
+        """THEORIZE: Form hypotheses about market behavior."""
+        logger.info("🎯 THEORIZE: Forming market hypotheses...")
+        
+        theories = []
+        
+        # Analyze high APR pools
+        high_apr_pools = [
+            obs for obs in state["observations"] 
+            if obs.get("type") == "high_yield_pool" and obs.get("apr", 0) > 50
+        ]
+        
+        if high_apr_pools:
+            theories.append(
+                f"High APR opportunity: {len(high_apr_pools)} pools offering >50% APR. "
+                f"Top pool {high_apr_pools[0]['pool']} at {high_apr_pools[0]['apr']:.1f}% APR."
+            )
+            
+        # Gas optimization theory
+        gas_obs = next((obs for obs in state["observations"] if obs["type"] == "gas_optimization"), None)
+        if gas_obs and gas_obs.get("data", {}).get("recommended_window"):
+            theories.append(
+                f"Gas optimization window: Best time for transactions is "
+                f"{gas_obs['data']['recommended_window']}"
+            )
+            
+        state["theories"] = theories
+        logger.info(f"💡 Formed {len(theories)} theories")
+        
+        return state
+        
+    async def decide(self, state: AgentState) -> AgentState:
+        """DECIDE: Make actionable decisions."""
+        logger.info("🎯 DECIDE: Making strategic decisions...")
+        
+        decisions = []
+        
+        # Decision logic based on analysis and theories
+        if self._is_observation_mode():
+            decisions.append({
+                "action": "observe",
+                "reason": "Still in observation period",
+                "confidence": 1.0
+            })
         else:
-            logger.info("✅ Observation period complete - ready to trade!")
-            return False
-        
-    async def _evaluate_strategy(
-        self,
-        strategy_name: str,
-        config: Dict,
-        state: AgentState
-    ) -> bool:
-        """Evaluate if a strategy should be executed."""
-        # Simple evaluation for now
-        # TODO: Implement sophisticated strategy evaluation
-        
-        if strategy_name == "arbitrage":
-            # Check if we found price discrepancies
-            return self.emotions["confidence"] > 0.6
-            
-        elif strategy_name == "liquidity_provision":
-            # Check if high APR pools exist
-            for obs in state["observations"]:
-                if obs["type"] == "pools":
-                    high_apr_pools = obs["data"].get("high_apr_pools", [])
-                    if any(p["apr"] > config["min_apr"] for p in high_apr_pools):
-                        return True
-                        
-        return False
-        
-    async def _execute_arbitrage(self, decision: Dict) -> Dict:
-        """Execute arbitrage strategy."""
-        try:
-            # Get arbitrage details from decision
-            pool1 = decision.get("pool1", {})
-            pool2 = decision.get("pool2", {})
-            token_in = decision.get("token_in", "USDC")
-            token_out = decision.get("token_out", "WETH")
-            amount = Decimal(str(decision.get("amount", "100")))
-            
-            # Get gas price for cost calculation
-            gas_price = await self.base_client.get_gas_price()
-            estimated_gas = await self.base_client.estimate_gas("swap")
-            
-            # Execute first swap
-            tx_hash1 = await self.base_client.swap_tokens(
-                token_in=token_in,
-                token_out=token_out,
-                amount_in=amount,
-                stable=pool1.get("stable", False)
-            )
-            
-            if not tx_hash1:
-                return {
-                    "success": False,
-                    "strategy": "arbitrage",
-                    "error": "First swap failed"
-                }
-            
-            # Get output balance
-            intermediate_balance = await self.base_client.get_balance(token_out)
-            
-            # Execute reverse swap
-            tx_hash2 = await self.base_client.swap_tokens(
-                token_in=token_out,
-                token_out=token_in,
-                amount_in=intermediate_balance,
-                stable=pool2.get("stable", False)
-            )
-            
-            if not tx_hash2:
-                return {
-                    "success": False,
-                    "strategy": "arbitrage",
-                    "error": "Second swap failed"
-                }
-            
-            # Calculate profit
-            final_balance = await self.base_client.get_balance(token_in)
-            profit = final_balance - amount
-            gas_cost = gas_price * Decimal(estimated_gas * 2) / Decimal(10**9)  # Two swaps
-            
-            # Update performance metrics
-            if profit > gas_cost:
-                self.performance["winning_trades"] += 1
-                self.performance["total_profit"] += float(profit - gas_cost)
-            else:
-                self.performance["losing_trades"] += 1
-            
-            return {
-                "success": True,
-                "strategy": "arbitrage",
-                "profit": float(profit),
-                "gas_used": float(gas_cost),
-                "tx_hashes": [tx_hash1, tx_hash2],
-                "details": f"Arbitraged {token_in}/{token_out} across pools"
-            }
-            
-        except Exception as e:
-            logger.error(f"Arbitrage execution failed: {e}")
-            return {
-                "success": False,
-                "strategy": "arbitrage",
-                "error": str(e)
-            }
-        
-    async def _execute_liquidity_provision(self, decision: Dict) -> Dict:
-        """Execute liquidity provision strategy."""
-        try:
-            # Get LP details from decision
-            pool = decision.get("pool", {})
-            token_a = pool.get("token_a", "USDC")
-            token_b = pool.get("token_b", "WETH")
-            stable = pool.get("stable", False)
-            
-            # Calculate amounts based on current pool ratio
-            pool_info = await self.base_client.get_pool_info(token_a, token_b, stable)
-            if not pool_info:
-                return {
-                    "success": False,
-                    "strategy": "liquidity_provision",
-                    "error": "Could not get pool info"
-                }
-            
-            # Get balances
-            balance_a = await self.base_client.get_balance(token_a)
-            balance_b = await self.base_client.get_balance(token_b)
-            
-            # Calculate optimal amounts based on pool ratio
-            ratio = pool_info.get("ratio", Decimal("1"))
-            
-            # Use smaller balance to determine amounts
-            if balance_a / ratio < balance_b:
-                amount_a = balance_a * Decimal("0.5")  # Use 50% of balance
-                amount_b = amount_a * ratio
-            else:
-                amount_b = balance_b * Decimal("0.5")
-                amount_a = amount_b / ratio
-            
-            # Add liquidity
-            tx_hash = await self.base_client.add_liquidity(
-                token_a=token_a,
-                token_b=token_b,
-                amount_a=amount_a,
-                amount_b=amount_b,
-                stable=stable
-            )
-            
-            if not tx_hash:
-                return {
-                    "success": False,
-                    "strategy": "liquidity_provision",
-                    "error": "Add liquidity transaction failed"
-                }
-            
-            # Calculate position value
-            position_value = float(amount_a + amount_b)  # Simplified
-            
-            # Update active positions
-            self.performance["active_positions"] += 1
-            
-            return {
-                "success": True,
-                "strategy": "liquidity_provision",
-                "pool": f"{token_a}/{token_b}",
-                "apr": float(pool.get("apr", 0)),
-                "position_value": position_value,
-                "amounts": {
-                    token_a: float(amount_a),
-                    token_b: float(amount_b)
-                },
-                "tx_hash": tx_hash
-            }
-            
-        except Exception as e:
-            logger.error(f"Liquidity provision failed: {e}")
-            return {
-                "success": False,
-                "strategy": "liquidity_provision",
-                "error": str(e)
-            }
-        
-    async def _execute_yield_farming(self, decision: Dict) -> Dict:
-        """Execute yield farming strategy."""
-        try:
-            # For Aerodrome, yield farming typically involves:
-            # 1. Claiming AERO rewards from gauges
-            # 2. Compounding rewards back into positions
-            
-            # Get active LP positions (simplified - in production would track positions)
-            positions = decision.get("positions", [])
-            
-            if not positions:
-                return {
-                    "success": False,
-                    "strategy": "yield_farming",
-                    "error": "No active positions to farm"
-                }
-            
-            total_rewards = Decimal("0")
-            successful_claims = 0
-            
-            # In production, this would interact with gauge contracts
-            # For now, estimate rewards based on position value and APR
-            for position in positions:
-                position_value = Decimal(str(position.get("value", 0)))
-                apr = Decimal(str(position.get("apr", 0)))
+            # Check for rebalancing opportunities
+            for rec in state.get("rebalance_recommendations", []):
+                if rec.get("expected_profit", 0) > 50:  # $50 minimum
+                    decisions.append({
+                        "action": "rebalance",
+                        "from_pool": rec["current_pool"],
+                        "to_pool": rec["recommended_pool"],
+                        "reason": rec["reason"],
+                        "expected_profit": rec["expected_profit"],
+                        "confidence": self.emotions["confidence"]
+                    })
+                    
+            # Check for new high-yield positions
+            if not decisions:  # No rebalancing needed
+                top_pools = [
+                    obs for obs in state["observations"]
+                    if obs.get("type") == "high_yield_pool" and obs.get("apr", 0) > 30
+                ]
                 
-                # Estimate daily rewards
-                daily_reward = position_value * apr / Decimal("36500")  # APR to daily
-                
-                # Simulate claiming (would be actual contract call)
-                total_rewards += daily_reward
-                successful_claims += 1
-            
-            # Compound rewards by swapping to pool tokens
-            if total_rewards > 0 and decision.get("compound", True):
-                # Swap half AERO rewards to USDC for balanced LP
-                half_rewards = total_rewards / 2
-                
-                # This would be actual swap in production
-                compound_tx = await self.base_client.swap_tokens(
-                    token_in="AERO",
-                    token_out="USDC",
-                    amount_in=half_rewards,
-                    stable=False
+                if top_pools and self.emotions["confidence"] > 0.7:
+                    pool = top_pools[0]
+                    decisions.append({
+                        "action": "add_liquidity",
+                        "pool": pool["pool"],
+                        "token_a": pool["pool"].split("/")[0],
+                        "token_b": pool["pool"].split("/")[1],
+                        "amount_a": 100,  # Start small
+                        "amount_b": 100,
+                        "reason": f"High APR opportunity at {pool['apr']:.1f}%",
+                        "confidence": self.emotions["confidence"]
+                    })
+                    
+        state["decisions"] = decisions
+        logger.info(f"⚖️ Made {len(decisions)} decisions")
+        
+        return state
+        
+    async def learn(self, state: AgentState) -> AgentState:
+        """LEARN: Extract patterns and store learnings."""
+        logger.info("📚 LEARN: Extracting patterns...")
+        
+        # Store observations as memories
+        for obs in state["observations"]:
+            if obs.get("type") == "high_yield_pool":
+                await self.memory.remember(
+                    content=f"Pool {obs['pool']} offering {obs['apr']:.1f}% APR with ${obs['tvl']:,.0f} TVL",
+                    memory_type=MemoryType.OBSERVATION,
+                    category="pool_analysis",
+                    metadata={
+                        "pool": obs["pool"],
+                        "apr": obs["apr"],
+                        "tvl": obs["tvl"],
+                        "volume": obs.get("volume_24h", 0)
+                    }
                 )
                 
-                compound_success = compound_tx is not None
-            else:
-                compound_success = False
-            
-            return {
-                "success": True,
-                "strategy": "yield_farming",
-                "rewards_claimed": float(total_rewards),
-                "positions_farmed": successful_claims,
-                "compounded": compound_success,
-                "details": f"Claimed {total_rewards:.2f} AERO from {successful_claims} positions"
-            }
-            
-        except Exception as e:
-            logger.error(f"Yield farming failed: {e}")
-            return {
-                "success": False,
-                "strategy": "yield_farming",
-                "error": str(e)
-            }
-        
-    def _calculate_win_rate(self) -> float:
-        """Calculate win rate."""
-        total = self.performance["winning_trades"] + self.performance["losing_trades"]
-        if total == 0:
-            return 0.0
-        return self.performance["winning_trades"] / total
-        
-    def _normalize_emotions(self):
-        """Normalize emotional values to prevent extremes."""
-        for emotion in self.emotions:
-            self.emotions[emotion] = max(0.1, min(0.9, self.emotions[emotion]))
-    
-    def _pattern_matches_current_state(self, pattern: Dict, state: AgentState) -> bool:
-        """Check if a pattern matches current market state."""
-        current_hour = datetime.utcnow().hour
-        current_day = datetime.utcnow().strftime("%A")
-        
-        # Check time-based patterns
-        if pattern.get("hour") is not None:
-            # Allow 1 hour window
-            if abs(current_hour - pattern["hour"]) > 1:
-                return False
+        # Learn from decisions made
+        for decision in state.get("decisions", []):
+            if decision["action"] != "observe":
+                await self.memory.remember(
+                    content=f"Decided to {decision['action']} because {decision['reason']}",
+                    memory_type=MemoryType.STRATEGY,
+                    category="strategy_performance",
+                    metadata={
+                        "action": decision["action"],
+                        "confidence": decision["confidence"],
+                        "expected_outcome": decision.get("expected_profit", 0)
+                    }
+                )
                 
-        if pattern.get("day") and pattern["day"] != current_day:
-            return False
-            
-        # Check gas price patterns
-        if pattern.get("gas_price"):
-            gas_obs = next((obs for obs in state["observations"] if obs["type"] == "gas"), None)
-            if gas_obs:
-                current_gas = float(gas_obs["data"]["price"])
-                pattern_gas = float(pattern["gas_price"])
-                # Allow 20% variance
-                if abs(current_gas - pattern_gas) / pattern_gas > 0.2:
-                    return False
-                    
-        return True
+        logger.info("✅ Learning complete")
+        return state
         
-    def _pattern_to_strategy(self, pattern: Dict) -> Optional[Dict]:
-        """Convert a pattern to an actionable strategy."""
-        pattern_type = pattern.get("type", "").lower()
-        description = pattern.get("description", "").lower()
+    async def reflect(self, state: AgentState) -> AgentState:
+        """REFLECT: Self-evaluate and adjust emotional state."""
+        logger.info("🪞 REFLECT: Self-evaluation...")
         
-        # Map patterns to strategies
-        if "arbitrage" in pattern_type or "price discrepancy" in description:
-            return {
-                "name": "arbitrage",
-                "parameters": {
-                    "enabled": True,
-                    "min_profit": 5.0,  # Conservative for pattern-based
-                    "max_gas_percent": 0.25,
-                }
-            }
-        elif "high apr" in description or "liquidity" in pattern_type:
-            return {
-                "name": "liquidity_provision",
-                "parameters": {
-                    "enabled": True,
-                    "min_apr": pattern.get("min_apr", 25.0),
-                    "max_il_tolerance": 0.04,  # More conservative
-                }
-            }
-        elif "gas" in pattern_type and ("low" in description or "optimal" in description):
-            # Good time for any gas-intensive operation
-            return {
-                "name": "yield_farming",
-                "parameters": {
-                    "enabled": True,
-                    "compound_frequency": 7200,  # 2 hours during low gas
-                    "min_pending_rewards": 3.0,
-                }
-            }
+        # Adjust emotions based on outcomes
+        successful_decisions = len([d for d in state["decisions"] if d.get("confidence", 0) > 0.7])
+        total_decisions = len(state["decisions"])
+        
+        if total_decisions > 0:
+            success_rate = successful_decisions / total_decisions
             
-        return None
+            # Update confidence
+            self.emotions["confidence"] = min(0.95, self.emotions["confidence"] * (1 + success_rate * 0.1))
+            
+            # Update satisfaction
+            self.emotions["satisfaction"] = success_rate
+            
+        # Store emotional state
+        if self.firestore:
+            self.firestore.save_agent_state({
+                "emotions": self.emotions,
+                "performance": {
+                    "total_profit": float(self.performance["total_profit"]),
+                    "winning_trades": self.performance["winning_trades"],
+                    "losing_trades": self.performance["losing_trades"]
+                },
+                "observation_mode": self._is_observation_mode()
+            })
+            
+        logger.info(f"🎭 Emotional state: {self.emotions}")
+        return state

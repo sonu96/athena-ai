@@ -10,10 +10,10 @@ services:
     environment:
       - CDP_API_KEY=${CDP_API_KEY}
       - CDP_API_SECRET=${CDP_API_SECRET}
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - QUICKNODE_API_KEY=${QUICKNODE_API_KEY}
+      - GOOGLE_AI_API_KEY=${GOOGLE_AI_API_KEY}
       - LANGSMITH_API_KEY=${LANGSMITH_API_KEY}
       - MEM0_API_KEY=${MEM0_API_KEY}
-      - BASE_RPC_URL=${BASE_RPC_URL:-https://mainnet.base.org}
       - GCP_PROJECT_ID=${GCP_PROJECT_ID}
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
     volumes:

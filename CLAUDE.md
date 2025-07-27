@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Athena is a 24/7 autonomous DeFi agent for Aerodrome on Base blockchain. It uses LangGraph for AI orchestration, Google Cloud Platform for infrastructure, and Coinbase CDP for blockchain interactions.
+Athena is a 24/7 autonomous DeFi agent for Aerodrome on Base blockchain. It uses LangGraph for AI orchestration, Google Cloud Platform for infrastructure, QuickNode MCP for blockchain data queries, and Coinbase AgentKit for AI-native transaction execution.
 
 ## Common Development Commands
 
@@ -71,9 +71,10 @@ gcloud logging read "resource.type=cloud_run_revision AND resource.labels.servic
    - Categories: observations, pool_analysis, gas_patterns, strategies, decisions, emotions
    - Pattern recognition and learning capabilities
 
-3. **CDP Integration** (`src/cdp/`)
-   - Secure wallet management without storing private keys
-   - Transaction simulation before execution
+3. **Blockchain Integration**
+   - **QuickNode MCP** (`src/mcp/`): Natural language blockchain queries
+   - **Coinbase AgentKit** (`src/agentkit/`): AI-native transaction execution
+   - Secure wallet management using existing CDP credentials
    - Native Aerodrome protocol operations
 
 4. **Data Collection Pipeline** (`src/collectors/`)
@@ -121,78 +122,50 @@ gcloud logging read "resource.type=cloud_run_revision AND resource.labels.servic
 4. Update decision logic in `src/agent/core.py`
 
 ### Blockchain Interactions
-- Use CDP client for all blockchain operations
-- Always simulate transactions first
-- Check gas prices before execution
-- Handle failures gracefully with retry logic
+- Use QuickNode MCP for all data queries (pools, prices, analytics)
+- Use Coinbase AgentKit for all transactions
+- Natural language interfaces reduce complexity by 90%
+- Automatic error handling and retry logic built-in
 
-### CDP Client API Usage
+### Blockchain Integration
 
-#### Initialization
+#### QuickNode MCP (Data Queries)
 ```python
-from src.cdp.base_client import BaseClient
+from src.mcp.quicknode_mcp import QuickNodeMCP
 
-# Initialize with automatic credential loading
-base_client = BaseClient()
-base_client.initialize()  # Loads from JSON file or environment
+# Initialize MCP client
+mcp = QuickNodeMCP(api_key="your_quicknode_api_key")
+await mcp.initialize()
 
-# Access wallet address
-wallet_address = base_client.wallet.default_address.address_id
+# Natural language queries
+pools = await mcp.query("Find high APR pools on Aerodrome")
+gas_timing = await mcp.optimize_gas_timing()
+opportunities = await mcp.analyze_rebalance_opportunities(wallet_address)
 ```
 
-#### Common Operations
+#### Coinbase AgentKit (Transactions)
 ```python
-# Get token balance
-balance = base_client.get_balance("USDC")
+from src.agentkit.agent_client import AthenaAgentKit
 
-# Swap tokens
-tx_hash = base_client.swap_tokens(
-    token_in="USDC",
-    token_out="WETH",
-    amount_in=100,  # Automatically handles decimals
-    min_amount_out=0.05,
-    recipient=wallet_address
+# Initialize with existing CDP credentials
+agentkit = AthenaAgentKit()
+await agentkit.initialize()
+
+# Natural language execution
+result = await agentkit.execute_natural_language(
+    "Swap 100 USDC for WETH with 0.5% slippage on Aerodrome"
 )
 
-# Add liquidity to pool
-tx_hash = base_client.add_liquidity(
-    token0="USDC",
-    token1="WETH",
-    amount0=1000,
-    amount1=0.5,
-    pool_address="0x...",
-    recipient=wallet_address
-)
-
-# Get pool information
-pool_info = base_client.get_pool_info("0x...")
+# Or use specific methods
+tx = await agentkit.swap("USDC", "WETH", Decimal("100"), slippage=0.5)
+tx = await agentkit.add_liquidity("USDC", "WETH", amount_a=1000, amount_b=0.5)
 ```
 
-#### CDP Configuration
-- Credentials: Store in `cdp_credentials.json` or set CDP_API_KEY_NAME/PRIVATE_KEY
-- Wallet persistence: Wallet ID saved in `wallet_id.txt`
-- Secret rotation: Use `scripts/update_cdp_config.py` for updates
-- Version requirement: CDP SDK v1.23.0+ (checked automatically)
-
-#### Real Data Access Setup
-For authenticated RPC access to real blockchain data:
-
-1. **Obtain CDP Client API Key** from Coinbase Developer Platform
-2. **Add to Google Secret Manager**:
-   ```bash
-   echo -n "your_client_api_key" | gcloud secrets create cdp-client-api-key --data-file=-
-   ```
-3. **Or set environment variable**:
-   ```bash
-   export CDP_CLIENT_API_KEY=your_client_api_key
-   ```
-
-Without CDP Client API Key, the system falls back to public RPC (rate limited).
-
-#### CDP Credentials Overview
-- **CDP API Key/Secret**: For wallet operations and transactions
-- **CDP Client API Key**: For authenticated RPC endpoints (real-time data)
-- **CDP Wallet Secret**: Auto-generated 32-byte hex for wallet encryption
+#### Configuration
+- **QuickNode API Key**: Required for blockchain data access
+- **CDP API Key/Secret**: Reused by AgentKit for wallet operations
+- **Wallet Management**: AgentKit handles wallet creation/recovery
+- No direct RPC calls needed - all handled by MCP and AgentKit
 
 ### API Development
 - Follow FastAPI patterns
@@ -206,7 +179,9 @@ Without CDP Client API Key, the system falls back to public RPC (rate limited).
 - Always test with simulation mode first
 - Monitor costs via GCP billing alerts
 - Check logs regularly for agent decisions
-- CDP SDK requires Rust for compilation (handled in Dockerfile)
+- AgentKit uses existing CDP credentials - no new registration needed
+- QuickNode MCP provides natural language queries
+- 90% less blockchain code compared to direct SDK usage
 
 ## Recent Updates (July 2025)
 

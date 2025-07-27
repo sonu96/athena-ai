@@ -1,413 +1,647 @@
-# Database Architecture - Athena AI
+# Athena AI Database Architecture
 
 ## Overview
 
-Athena AI employs a sophisticated multi-layered database architecture designed to support autonomous DeFi operations, pattern learning, and memory formation. The system combines vector-based semantic memory (Mem0), structured document storage (Google Firestore), and in-memory caching for optimal performance.
+Athena AI employs a sophisticated dual-database architecture combining **Mem0** for vector-based semantic memory storage and **Google Cloud Firestore** for structured data persistence. This architecture enables intelligent pattern recognition, learning from experience, and adaptive decision-making in DeFi operations.
 
-## Core Components
+## Architecture Components
 
-### 1. Mem0 - Semantic Memory System
+### 1. Memory System (Mem0)
 
-**Purpose**: Long-term semantic memory storage with vector similarity search capabilities
+Mem0 serves as Athena's episodic and semantic memory, providing vector-based storage and retrieval capabilities for learning and pattern recognition.
 
-**Implementation**: `src/agent/memory.py`
-
-**Key Features**:
-- Vector-based storage for semantic similarity search
-- Supports both cloud (API-based) and local fallback modes
-- Structured memory types with confidence scoring
-- Reference linking between related memories
-
-**Memory Types**:
+#### Memory Types
 ```python
 class MemoryType(str, Enum):
-    OBSERVATION = "observation"    # Raw market observations
-    PATTERN = "pattern"           # Discovered patterns
-    STRATEGY = "strategy"         # Strategy configurations
-    OUTCOME = "outcome"           # Execution results
-    LEARNING = "learning"         # Derived insights
-    ERROR = "error"              # Error tracking
+    OBSERVATION = "observation"  # Raw market observations
+    PATTERN = "pattern"         # Discovered patterns and correlations
+    STRATEGY = "strategy"       # Strategy execution plans
+    OUTCOME = "outcome"         # Results of actions taken
+    LEARNING = "learning"       # Extracted insights and lessons
+    ERROR = "error"            # Error scenarios for learning
 ```
 
-**Memory Categories** (from `config/settings.py`):
-- `market_pattern`: Market state observations and patterns
-- `gas_optimization`: Gas price patterns and optimal timing
-- `strategy_performance`: Trading strategy results
-- `pool_behavior`: Liquidity pool insights and behaviors
-- `user_preference`: User-defined preferences
-- `error_learning`: Error tracking and learning
-- `profit_source`: Sources of profitable opportunities
-- `gauge_emissions`: AERO emission rates and patterns (NEW)
-- `volume_tracking`: Real swap volumes from events (NEW)
-- `arbitrage_opportunity`: Detected price imbalances (NEW)
-- `new_pool`: New pool discoveries (NEW)
-- `apr_anomaly`: Unusual APR changes (NEW)
-- `fee_collection`: Fee event tracking (NEW)
+#### Memory Categories
 
-**Storage Format**:
+The system organizes memories into specialized categories for efficient retrieval:
+
+**Core Categories:**
+- `market_pattern` - Market behavior patterns
+- `gas_optimization` - Gas price patterns and optimal windows
+- `strategy_performance` - Historical strategy outcomes
+- `pool_behavior` - Individual pool characteristics
+- `pool_analysis` - General pool metrics and data
+- `user_preference` - User-defined preferences
+- `error_learning` - Error tracking and recovery
+- `profit_source` - Sources of profitable opportunities
+
+**Rebalancing Pattern Categories:**
+- `apr_degradation_patterns` - How APRs decay over time
+- `gas_optimization_windows` - Best times for transactions
+- `compound_roi_patterns` - Optimal compounding frequency
+- `pool_lifecycle_patterns` - New pool behavior, TVL impact
+- `rebalance_success_metrics` - Learn from past rebalances
+- `tvl_impact_patterns` - How TVL affects APR
+- `rebalance_timing` - Optimal times to rebalance
+- `compound_threshold` - Minimum rewards to compound
+
+**Additional Categories:**
+- `gauge_emissions` - AERO emission rates and patterns
+- `volume_tracking` - Real swap volumes from events
+- `arbitrage_opportunity` - Detected price imbalances
+- `new_pool` - New pool discoveries
+- `apr_anomaly` - Unusual APR changes
+- `fee_collection` - Fee event tracking
+- `cross_pool_correlation` - Correlations between different pools
+
+#### Memory Storage Structure
+
+Each memory entry contains:
 ```python
-MemoryEntry = {
-    "id": "unique_id",
-    "type": MemoryType,
-    "category": str,
-    "content": str,
+class MemoryEntry(BaseModel):
+    id: Optional[str]              # Unique memory identifier
+    type: MemoryType              # Type of memory
+    category: str                 # Category for organization
+    content: str                  # Memory content (text or JSON)
+    metadata: Dict[str, Any]      # Additional structured data
+    confidence: float             # Confidence score (0-1)
+    timestamp: datetime           # When memory was created
+    references: List[str]         # Related memory IDs
+```
+
+#### Memory Operations
+
+**Storage:**
+- Memories are stored with semantic embedding for similarity search
+- Metadata is cleaned and serialized for JSON compatibility
+- Large metadata is automatically truncated to fit Mem0's 2000 character limit
+- Priority fields preserved: `pool`, `apr`, `tvl`, `volume`, `pattern_type`
+- Custom JSON encoder handles Decimal and datetime objects
+
+**Retrieval:**
+- Vector similarity search based on query
+- Filtering by category, type, and confidence threshold
+- Time-based filtering for recent memories
+- Pool-specific memory queries with metadata filtering
+
+**Special Memory Functions:**
+```python
+# Pool-specific memory recall
+async def recall_pool_memories(pool_pair: str, memory_type: Optional[MemoryType], 
+                             time_window_hours: Optional[int], limit: int)
+
+# Pattern discovery across observations
+async def find_patterns(observations: List[str], min_occurrences: int)
+
+# Cross-pool correlation tracking
+async def remember_pool_correlation(pool_a: str, pool_b: str, 
+                                  correlation_type: str, correlation_strength: float)
+
+# Timeline construction for pools
+async def get_pool_timeline(pool_pair: str, hours: int)
+```
+
+### 2. Firestore Collections
+
+Firestore provides structured data storage for operational data, metrics, and discovered patterns.
+
+#### Collection Schemas
+
+##### `agent_state`
+Current operational state of the agent:
+```json
+{
+  "current": {
+    "cycle_number": 1234,
+    "positions": ["position_id_1", "position_id_2"],
+    "total_value_usd": 10000.50,
+    "last_action": "rebalance",
+    "emotional_state": "confident",
+    "observation_mode": false,
+    "last_update": "2024-01-15T10:30:00Z"
+  }
+}
+```
+
+##### `cycles`
+Historical record of each reasoning cycle:
+```json
+{
+  "cycle_1234": {
+    "cycle_number": 1234,
+    "timestamp": "2024-01-15T10:30:00Z",
+    "observations": [...],
+    "decisions": [...],
+    "actions_taken": [...],
+    "gas_used": 0.025,
+    "profit_loss": 12.50
+  }
+}
+```
+
+##### `positions`
+Active liquidity positions:
+```json
+{
+  "position_id": {
+    "pool_address": "0x...",
+    "pool_pair": "WETH/USDC",
+    "lp_tokens": "1000000000000000000",
+    "value_usd": 5000.00,
+    "apr": 45.5,
+    "created_at": "2024-01-10T08:00:00Z",
+    "status": "active",
+    "last_compound": "2024-01-15T08:00:00Z"
+  }
+}
+```
+
+##### `performance`
+Aggregated performance metrics:
+```json
+{
+  "summary": {
+    "total_profit": 1250.50,
+    "total_gas_spent": 125.30,
+    "win_rate": 0.85,
+    "average_apr": 42.5,
+    "total_cycles": 5000,
+    "successful_rebalances": 45,
+    "failed_rebalances": 3,
+    "last_update": "2024-01-15T10:30:00Z"
+  }
+}
+```
+
+##### `observed_patterns`
+Discovered market patterns:
+```json
+{
+  "pattern_id": {
+    "pattern_type": "apr_degradation",
+    "description": "New pools lose 30-50% APR in first week",
+    "confidence": 0.85,
+    "occurrences": 25,
+    "discovered_at": "2024-01-05T12:00:00Z",
     "metadata": {
-        "confidence": float,
-        "timestamp": datetime,
-        "references": List[str],
-        # Additional context-specific metadata
+      "avg_apr_drop": 0.42,
+      "time_window_days": 7,
+      "affected_pools": ["pool1", "pool2"]
     }
+  }
 }
 ```
 
-### 2. Google Firestore - Structured Data
+##### `pattern_confidence`
+Confidence scores for patterns based on outcomes:
+```json
+{
+  "pattern_id": {
+    "pattern_id": "pattern_123",
+    "confidence": 0.87,
+    "occurrences": 50,
+    "successes": 44,
+    "last_update": "2024-01-15T10:00:00Z"
+  }
+}
+```
 
-**Purpose**: Persistent structured storage for state, metrics, and operational data
+##### `observation_metrics`
+Metrics from observation periods:
+```json
+{
+  "current": {
+    "observation_days": 3,
+    "patterns_discovered": 15,
+    "pools_analyzed": 250,
+    "high_confidence_patterns": 8,
+    "avg_pattern_confidence": 0.75,
+    "last_update": "2024-01-15T10:30:00Z"
+  }
+}
+```
 
-**Implementation**: `src/gcp/firestore_client.py`
+##### `pool_profiles`
+Comprehensive profiles for individual pools:
+```json
+{
+  "0x...pool_address": {
+    "pool_address": "0x...",
+    "pair": "WETH/USDC",
+    "stable": false,
+    "created_at": "2024-01-01T00:00:00Z",
+    "apr_range": [15.5, 125.8],
+    "tvl_range": [100000, 5000000],
+    "volume_range": [50000, 2000000],
+    "hourly_patterns": {
+      "14": {
+        "avg_apr": 45.5,
+        "avg_volume": 500000,
+        "count": 30
+      }
+    },
+    "daily_patterns": {
+      "Monday": {
+        "avg_apr": 42.0,
+        "avg_volume": 450000,
+        "count": 10
+      }
+    },
+    "typical_volume_to_tvl": 0.15,
+    "volatility_score": 0.25,
+    "correlation_with_gas": -0.35,
+    "observations_count": 500,
+    "confidence_score": 0.92,
+    "last_updated": "2024-01-15T10:00:00Z"
+  }
+}
+```
 
-**Collections**:
+##### `pool_metrics`
+Time-series metrics for pools:
+```json
+{
+  "metric_id": {
+    "pool_address": "0x...",
+    "timestamp": "2024-01-15T10:00:00Z",
+    "apr": 45.5,
+    "tvl": 2500000,
+    "volume_24h": 375000,
+    "fee_apr": 25.5,
+    "incentive_apr": 20.0,
+    "reserves": {
+      "WETH": 1000.5,
+      "USDC": 2500000
+    },
+    "ratio": 0.0004,
+    "gas_price": 25.5
+  }
+}
+```
 
-#### `agent_state`
-- Document: `current`
-- Purpose: Current agent operational state
-- Fields:
-  - `cycle_number`: Current reasoning cycle
-  - `emotions`: Emotional state metrics
-  - `last_decision`: Most recent decision
-  - `last_update`: Timestamp
+##### `pattern_correlations`
+Cross-pool correlations:
+```json
+{
+  "correlation_id": {
+    "pool_a": "WETH/USDC",
+    "pool_b": "WETH/USDT",
+    "correlation_type": "volume",
+    "correlation_strength": 0.85,
+    "discovered_at": "2024-01-10T15:00:00Z",
+    "metadata": {
+      "sample_size": 100,
+      "time_window_hours": 168
+    }
+  }
+}
+```
 
-#### `cycles`
-- Documents: `cycle_{number}`
-- Purpose: Historical reasoning cycle records
-- Fields:
-  - `cycle_number`: Cycle identifier
-  - `state`: Complete state snapshot
-  - `decisions`: Decisions made
-  - `timestamp`: Execution time
+## Pool Profile System
 
-#### `positions`
-- Purpose: Active trading positions
-- Fields:
-  - `token_pair`: Trading pair
-  - `type`: Position type (LP, stake, etc.)
-  - `amount`: Position size
-  - `entry_price`: Entry price
-  - `created_at`: Creation timestamp
-  - `status`: active/closed
+The pool profile system (`src/agent/pool_profiles.py`) tracks individual pool behaviors and patterns over time.
 
-#### `performance`
-- Document: `summary`
-- Purpose: Aggregated performance metrics
-- Fields:
-  - `total_profit`: Cumulative profit
-  - `winning_trades`: Successful trade count
-  - `losing_trades`: Failed trade count
-  - `win_rate`: Success percentage
-  - `last_update`: Update timestamp
-
-#### `observed_patterns`
-- Purpose: Discovered market patterns during observation
-- Fields:
-  - `pattern_type`: Type of pattern
-  - `description`: Pattern details
-  - `confidence`: Initial confidence
-  - `discovered_at`: Discovery timestamp
-  - `context`: Market conditions
-
-#### `pattern_confidence`
-- Purpose: Pattern success tracking
-- Fields:
-  - `pattern_id`: Reference to pattern
-  - `confidence`: Current confidence score
-  - `occurrences`: Total observations
-  - `successes`: Successful predictions
-  - `last_update`: Latest update
-
-#### `observation_metrics`
-- Document: `current`
-- Purpose: Observation phase metrics
-- Fields:
-  - `patterns_discovered`: Pattern count
-  - `observations_made`: Total observations
-  - `confidence_levels`: Pattern confidence map
-  - `last_update`: Update timestamp
-
-#### `pool_profiles` (NEW - v2.0)
-- Documents: Pool address as document ID
-- Purpose: Individual pool behavior profiles
-- Fields:
-  - `pool_address`: Pool contract address
-  - `pair`: Token pair (e.g., "WETH/USDC")
-  - `stable`: Whether it's a stable pool
-  - `apr_range`: [min, max] APR observed
-  - `tvl_range`: [min, max] TVL observed
-  - `volume_range`: [min, max] volume observed
-  - `hourly_patterns`: Hour → average metrics
-  - `daily_patterns`: Day → average metrics
-  - `typical_volume_to_tvl`: Average ratio
-  - `volatility_score`: APR volatility measure
-  - `correlation_with_gas`: Gas price correlation
-  - `observations_count`: Total observations
-  - `confidence_score`: Profile reliability score
-  - `last_updated`: Last update timestamp
-
-#### `pool_metrics` (NEW - v2.0)
-- Purpose: Time-series pool data
-- Fields:
-  - `pool_address`: Pool contract address
-  - `timestamp`: Observation time
-  - `apr`: Current APR
-  - `tvl`: Total value locked
-  - `volume_24h`: 24-hour volume
-  - `fee_apr`: Fee component of APR
-  - `incentive_apr`: Incentive component
-  - `reserves`: Token reserves
-  - `ratio`: Reserve ratio
-  - `gas_price`: Gas price at observation
-
-#### `pattern_correlations` (NEW - v2.0)
-- Purpose: Cross-pool pattern relationships
-- Fields:
-  - `pool_a`: First pool pair
-  - `pool_b`: Second pool pair
-  - `correlation_type`: Type (volume, apr, liquidity)
-  - `correlation_strength`: -1 to 1 correlation value
-  - `discovered_at`: Discovery timestamp
-  - `occurrences`: Number of observations
-  - `confidence`: Correlation confidence
-
-#### `gauge_data` (NEW - Real Data Collection)
-- Documents: Gauge address as document ID
-- Purpose: Gauge emission data and rewards
-- Fields:
-  - `gauge_address`: Gauge contract address
-  - `pool_address`: Associated pool address
-  - `reward_rate`: AERO tokens per second
-  - `total_supply`: Total LP tokens staked
-  - `aero_per_day`: Daily AERO emissions
-  - `last_update`: Update timestamp
-  - `historical_rates`: Time series of reward rates
-
-#### `event_volumes` (NEW - Real Data Collection)
-- Purpose: Real volume data from on-chain events
-- Fields:
-  - `pool_address`: Pool contract address
-  - `hour_key`: Hour identifier (YYYY-MM-DD-HH)
-  - `swap_volume`: Total swap volume in hour
-  - `fee_volume`: Total fees collected
-  - `swap_count`: Number of swaps
-  - `unique_traders`: Unique addresses
-  - `largest_swap`: Biggest single swap
-  - `timestamp`: Hour timestamp
-
-### 3. In-Memory Caches
-
-**Gas Monitor Cache** (`src/collectors/gas_monitor.py`):
+### PoolMetrics Data Structure
 ```python
-price_history = [
-    {
-        "price": Decimal,
-        "timestamp": datetime,
-        "hour": int,
-        "day_of_week": int
-    }
-]
-# Maintains 24-hour rolling window (2880 data points)
+@dataclass
+class PoolMetrics:
+    timestamp: datetime
+    apr: Decimal
+    tvl: Decimal
+    volume_24h: Decimal
+    fee_apr: Decimal
+    incentive_apr: Decimal
+    reserves: Dict[str, Decimal]
+    ratio: Decimal
+    gas_price: Optional[Decimal] = None
 ```
 
-**Pool Scanner Cache** (`src/collectors/pool_scanner.py`):
+### PoolProfile Features
+
+**Historical Tracking:**
+- APR ranges (min/max)
+- TVL ranges (min/max) 
+- Volume ranges (min/max)
+- Recent metrics buffer (last 100 observations)
+
+**Pattern Recognition:**
+- Hourly patterns (average metrics by hour)
+- Daily patterns (average metrics by day)
+- Time-based prediction capabilities
+
+**Behavioral Analysis:**
+- Typical volume-to-TVL ratio
+- Volatility score (APR standard deviation)
+- Gas price correlation coefficient
+- Anomaly detection with severity scoring
+
+**Confidence Scoring:**
 ```python
-pools = {
-    "TOKEN_A/TOKEN_B-stable": {
-        "pair": str,
-        "address": str,
-        "tvl": Decimal,
-        "volume_24h": Decimal,  # Real volume from events
-        "apr": Decimal,         # Real total APR
-        "fee_apr": Decimal,    # Calculated from volume
-        "incentive_apr": Decimal,  # From gauge emissions
-        "reserves": Dict[str, Decimal],
-        "timestamp": datetime
-    }
-}
+confidence = (
+    observation_weight * 0.4 +
+    recency_weight * 0.3 +
+    pattern_weight * 0.3
+)
 ```
 
-**Gauge Reader Cache** (`src/aerodrome/gauge_reader.py`):
+### Pool Profile Manager
+
+The `PoolProfileManager` class provides:
+- Profile creation and updates
+- Firestore persistence
+- High-confidence pool filtering
+- Gas-correlated pool identification
+- Opportunity prediction based on patterns
+
+## Smart Rebalancer System
+
+The rebalancer (`src/agent/rebalancer.py`) uses memories and patterns for intelligent position management.
+
+### Key Components
+
+**Memory-Driven Decision Making:**
+1. APR prediction based on historical patterns
+2. Gas optimization using learned windows
+3. Compound timing optimization
+4. Risk-adjusted rebalancing
+
+**Pattern Categories Used:**
+- `apr_degradation_patterns` - Predict APR decay
+- `gas_optimization_windows` - Find optimal gas times
+- `tvl_impact_patterns` - Assess TVL effects
+- `rebalance_success_metrics` - Learn from outcomes
+
+**Decision Flow:**
 ```python
-_gauge_cache = {
-    "pool_address": "gauge_address"
-}
-# TTL: 1 hour to reduce RPC calls
+1. Analyze current positions
+2. Query relevant memories for each pool
+3. Predict future APR using patterns
+4. Determine if rebalancing needed
+5. Find better opportunities
+6. Calculate profitability including gas
+7. Execute if profitable with high confidence
 ```
 
-**Event Monitor Cache** (`src/aerodrome/event_monitor.py`):
+**Learning Process:**
+- Records all rebalancing outcomes
+- Analyzes success patterns
+- Identifies optimal timing
+- Refines decision thresholds
+
+## Data Flow and Lifecycle
+
+### 1. Memory Formation Process
+
+```mermaid
+graph TD
+    A[MCP Query Result] --> B[Memory Classification]
+    B --> C{Memory Type?}
+    C -->|Pattern| D[Pattern Analysis]
+    C -->|Outcome| E[Performance Update]
+    C -->|Learning| F[Strategy Refinement]
+    D --> G[Confidence Scoring]
+    E --> G
+    F --> G
+    G --> H[Store in Mem0]
+    H --> I[Update Firestore]
+    I --> J[Update Pool Profiles]
+```
+
+### 2. Decision Making Flow
+
+```mermaid
+graph TD
+    A[Current State] --> B[Query Relevant Memories]
+    B --> C[MCP Natural Language Analysis]
+    C --> D[Pattern Matching]
+    D --> E[Confidence Evaluation]
+    E --> F{Confidence > Threshold?}
+    F -->|Yes| G[Execute via AgentKit]
+    F -->|No| H[Continue Observation]
+    G --> I[Record Outcome]
+    I --> J[Update Memories]
+    J --> K[Adjust Confidence]
+    K --> L[Update Pool Profile]
+```
+
+### 3. Pool Profile Update Flow
+
+1. **Metric Collection**: Every cycle collects current pool metrics
+2. **Profile Update**: Updates ranges, patterns, and behavioral scores
+3. **Pattern Detection**: Identifies hourly and daily patterns
+4. **Anomaly Detection**: Flags unusual behavior for investigation
+5. **Prediction**: Uses patterns to predict future metrics
+6. **Persistence**: Saves to Firestore for durability
+
+## Query Patterns and Optimization
+
+### 1. Common Query Patterns
+
+**Pattern Discovery:**
 ```python
-hourly_volumes = {
-    "pool_address": {
-        "YYYY-MM-DD-HH": Decimal  # Volume in that hour
-    }
-}
-daily_volumes = {
-    "pool_address": {
-        "YYYY-MM-DD": Decimal  # Daily total
-    }
-}
+# Find APR degradation patterns for new pools
+memories = await memory.recall(
+    "new pool APR degradation patterns",
+    memory_type=MemoryType.PATTERN,
+    category="apr_degradation_patterns",
+    min_confidence=0.7
+)
 ```
 
-## Data Flow Architecture
-
-### 1. Observation Flow (Enhanced with Real Data)
-```
-Market Data → Collectors → Memory System → Pattern Detection
-     ↓            ↓              ↓                ↓
-CDP Client   Gas Monitor    Mem0 Storage    Firestore
-     ↓       Pool Scanner                  (patterns)
-     ↓            ↓                              ↓
-RPC Reader   Gauge Reader                 pool_profiles
-     ↓       Event Monitor                gauge_data
-Blockchain                               event_volumes
+**Pool-Specific Analysis:**
+```python
+# Get all memories for a specific pool
+pool_memories = await memory.recall_pool_memories(
+    pool_pair="WETH/USDC",
+    time_window_hours=24,
+    limit=50
+)
 ```
 
-### 2. Decision Flow
-```
-Agent State → Memory Recall → Analysis → Decision
-     ↓            ↓             ↓          ↓
-Firestore      Mem0 Search   LangGraph  Firestore
-(state)        (context)     (process)   (cycles)
+**Cross-Pool Correlations:**
+```python
+# Find correlations between pools
+correlations = await memory.get_cross_pool_correlations()
 ```
 
-### 3. Learning Flow
+**Rebalancing Insights:**
+```python
+# Get gas optimization patterns
+gas_patterns = await memory.recall(
+    "gas price patterns optimal times",
+    memory_type=MemoryType.PATTERN,
+    category="gas_optimization_windows",
+    limit=20
+)
 ```
-Execution → Outcome → Learning → Memory Update
-    ↓          ↓         ↓            ↓
-CDP SDK    Firestore   Agent      Mem0 + Firestore
-          (positions)  Logic    (memories + confidence)
+
+### 2. Optimization Strategies
+
+**Memory Indexing:**
+- Memories indexed by type, category, and timestamp
+- Pool-specific memories indexed by pool address/pair
+- Confidence scores enable fast filtering
+- Metadata fields indexed for complex queries
+
+**Batch Operations:**
+- Bulk memory retrieval for related patterns
+- Parallel Firestore queries for efficiency
+- Cached pool profiles for frequent access
+- Async operations for non-blocking execution
+
+**Data Retention:**
+- Recent memories (< 24h) kept in fast access
+- Historical patterns aggregated and summarized
+- Low-confidence memories periodically pruned
+- Pool metrics aggregated hourly/daily
+
+## Pattern Learning System
+
+### 1. Pattern Discovery
+
+The system discovers patterns through:
+
+**Frequency Analysis:**
+- Repeated observations trigger pattern creation
+- Minimum occurrence threshold (default: 3)
+- Confidence increases with repetitions
+- Pattern merging for similar observations
+
+**Correlation Analysis:**
+- Cross-pool behavior correlations
+- Time-based pattern correlations
+- Gas price impact correlations
+- Volume-APR relationships
+
+**Outcome Tracking:**
+- Success/failure rates for strategies
+- Profit/loss patterns
+- Gas optimization outcomes
+- Rebalancing effectiveness
+
+### 2. Confidence Scoring
+
+Pool Profile Confidence:
+```python
+confidence = (
+    observation_score * 0.4 +    # Based on observation count
+    recency_score * 0.3 +        # How recent the data is
+    pattern_score * 0.3          # Pattern consistency
+)
 ```
 
-## Memory Recall Strategy
+Memory Confidence:
+- Initial confidence based on observation frequency
+- Updated based on prediction accuracy
+- Decays over time without reinforcement
+- Boosted by successful outcomes
 
-### Semantic Search (Mem0)
-1. **Query Construction**: Natural language queries based on current context
-2. **Vector Similarity**: Finds semantically similar memories
-3. **Confidence Filtering**: Only returns memories above threshold
-4. **Category Scoping**: Can filter by specific memory categories
+### 3. Pattern Evolution
 
-### Pattern Matching
-1. **Time-Based Patterns**: Hourly/daily patterns from observations
-2. **Market Conditions**: Patterns linked to specific market states
-3. **Success Tracking**: Confidence updates based on outcomes
+Patterns evolve through:
+- **Reinforcement**: Successful outcomes increase confidence
+- **Decay**: Unused patterns gradually lose confidence
+- **Refinement**: Patterns merge and split based on new data
+- **Pruning**: Low-confidence patterns removed
 
-## Data Persistence & Recovery
+## Data Persistence and Recovery
 
-### Backup Strategy
-- **Mem0**: Automatic cloud persistence (when using API)
-- **Firestore**: Google Cloud automatic backups
-- **Local Fallback**: In-memory storage for Mem0 if API unavailable
+### 1. Backup Strategy
 
-### Recovery Process
-1. Restore agent state from Firestore
-2. Reload high-confidence patterns
-3. Resume memory formation from last checkpoint
-4. Reconstruct in-memory caches from recent data
+**Mem0 Backups:**
+- Export functionality for all memories
+- JSON format for portability
+- Includes metadata and relationships
+- Periodic snapshots to Firestore
 
-## Performance Optimization
+**Firestore Backups:**
+- Automated GCP backups
+- Point-in-time recovery
+- Cross-region replication
+- Daily export to Cloud Storage
 
-### Caching Strategy
-- **Gas Prices**: 30-second update interval, 24-hour window
-- **Pool Data**: 5-minute update interval, full cache
-- **Memory Recall**: Results cached within reasoning cycle
+### 2. Data Consistency
 
-### Query Optimization
-- **Firestore**: Compound indexes on frequently queried fields
-- **Mem0**: Vector indices for fast similarity search
-- **Batch Operations**: Group writes to reduce API calls
+**Transaction Handling:**
+- Atomic updates for related data
+- Rollback on failures
+- Event sourcing for audit trail
+- Idempotent operations
 
-## Security Considerations
+**Synchronization:**
+- Mem0 and Firestore kept in sync
+- Async updates with retry logic
+- Conflict resolution strategies
+- Version tracking for updates
 
-### Data Sanitization
-- Decimal values converted to float for storage
-- Datetime objects converted to ISO format
-- Complex objects serialized to strings
-- No private keys or sensitive data in memory
+## Performance Considerations
 
-### Access Control
-- Firestore: Service account with minimal permissions
-- Mem0: API key authentication
-- Read-only access for monitoring endpoints
+### 1. Query Performance
 
-## Monitoring & Metrics
+**Mem0 Optimization:**
+- Vector indices for fast similarity search
+- Metadata filtering before vector search
+- Result caching for frequent queries
+- Batch operations for multiple recalls
+
+**Firestore Optimization:**
+- Composite indices for complex queries
+- Query result pagination
+- Denormalized data for read performance
+- Collection group queries for cross-collection searches
+
+### 2. Storage Efficiency
+
+**Memory Management:**
+- Automatic metadata truncation
+- Compression for large memories
+- Periodic cleanup of old data
+- Memory summarization for old entries
+
+**Cost Optimization:**
+- Tiered storage for historical data
+- Aggregation of time-series data
+- Efficient serialization formats
+- Read/write batching
+
+## Real-Time Monitoring
 
 ### Key Metrics Tracked
-- Total memories stored
+- Memory formation rate
 - Pattern discovery rate
-- Memory recall performance
-- Storage utilization
-- Query response times
+- Confidence score trends
+- Pool profile coverage
+- Rebalancing success rate
 
 ### Health Indicators
-- Memory formation rate
-- Pattern confidence trends
-- Successful recall percentage
+- Memory recall latency
+- Firestore query performance
+- Pattern prediction accuracy
 - Storage growth rate
-
-## Real Data Collection Architecture (NEW)
-
-### Data Sources
-1. **Gauge Contracts**: Direct reads for AERO emission rates
-2. **Event Logs**: Swap and Fee events for volume tracking
-3. **Pool Contracts**: Reserve data and pool parameters
-4. **Voter Contract**: Gauge addresses for pools
-
-### Collection Pipeline
-```
-1. Pool Scanner identifies pools to monitor
-2. Gauge Reader fetches emission data for each pool
-3. Event Monitor tracks swap/fee events in real-time
-4. Real APR calculation combines fee and emission data
-5. Data stored in appropriate Firestore collections
-6. Memory system indexes significant patterns
-```
-
-### APR Calculation Methodology
-- **Fee APR** = (24h_volume × fee_rate × 365) / TVL × 100
-- **Emission APR** = (reward_rate × seconds_per_year × AERO_price) / TVL × 100
-- **Total APR** = Fee APR + Emission APR
-
-### Event Monitoring Strategy
-- Query blocks in 1000-block chunks to prevent timeouts
-- Cache block timestamps to reduce RPC calls
-- Maintain hourly aggregates for efficient 24h calculations
-- Store raw event data for detailed analysis
-
-### Data Quality & Validation
-1. **Volume Verification**:
-   - Cross-reference event volumes with pool state changes
-   - Detect and filter wash trading patterns
-   - Validate against known pool constraints
-
-2. **APR Sanity Checks**:
-   - Flag APRs > 1000% for manual review
-   - Compare calculated vs reported values
-   - Track sudden APR changes as anomalies
-
-3. **Emission Validation**:
-   - Verify gauge exists for pool before reading
-   - Confirm reward rate changes align with epochs
-   - Track total AERO emissions vs protocol limits
-
-4. **Real-time Monitoring**:
-   - Alert on data collection failures
-   - Track RPC response times and errors
-   - Monitor memory usage and storage growth
+- API quota usage
 
 ## Future Enhancements
 
-1. **Multi-Agent Memory Sharing**: Enable memory synchronization across multiple agents
-2. **Advanced Pattern Recognition**: ML-based pattern discovery from raw memories
-3. **Memory Compression**: Automatic summarization of old memories
-4. **Cross-Chain Patterns**: Pattern recognition across multiple blockchains
-5. **Distributed Storage**: IPFS integration for decentralized memory storage
-6. **Historical Event Replay**: Backfill historical data for pattern learning
-7. **Price Oracle Integration**: Real-time token prices for accurate USD calculations
-8. **Voting Power Analysis**: Track veAERO voting patterns and bribe efficiency
+### 1. Advanced Analytics
+- Real-time pattern detection using streaming
+- Predictive modeling with ML integration
+- Advanced correlation analysis across chains
+- Sentiment analysis from external sources
+
+### 2. Scalability Improvements
+- Distributed memory system with sharding
+- Federated learning across agents
+- Edge caching for global deployment
+- GraphDB for complex relationships
+
+### 3. Enhanced Learning
+- Deep learning for pattern recognition
+- Reinforcement learning for strategy optimization
+- Multi-agent knowledge sharing protocols
+- Transfer learning from successful strategies
+
+### 4. Data Integration
+- Cross-chain pattern recognition
+- External data source integration
+- Social sentiment correlation
+- Macro market indicators
