@@ -38,4 +38,4 @@ HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
   CMD python -c "import requests; requests.get(f'http://localhost:{os.environ.get(\"PORT\", \"8080\")}/health')"
 
 # Run the application
-CMD ["python", "run_fixed.py"]
+CMD ["python", "run_simple.py"]
