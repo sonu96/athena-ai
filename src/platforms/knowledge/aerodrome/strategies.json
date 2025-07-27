@@ -1,0 +1,229 @@
+{
+  "proven_strategies": {
+    "stable_farming": {
+      "name": "Stable Pool Yield Farming",
+      "risk_level": "low",
+      "expected_apr": [8, 25],
+      "capital_required": 500,
+      "description": "Provide liquidity to stablecoin pools for consistent yields",
+      "setup": [
+        "Identify high-TVL stable pools (USDC/USDT, USDC/DAI)",
+        "Check emission allocation (aim for >1M veAERO votes)",
+        "Add balanced liquidity",
+        "Stake LP tokens in gauge",
+        "Compound rewards weekly"
+      ],
+      "optimization": {
+        "pool_selection": [
+          "Prefer pools with >$5M TVL",
+          "Check 30-day average APR",
+          "Verify consistent vote allocation"
+        ],
+        "position_management": [
+          "Use 50% of capital maximum per pool",
+          "Set up auto-compound if available",
+          "Monitor peg stability daily"
+        ],
+        "exit_conditions": [
+          "APR drops below 5%",
+          "Peg deviation >1% for 24h",
+          "Vote allocation drops 50%"
+        ]
+      }
+    },
+    
+    "veaero_maximizer": {
+      "name": "veAERO Vote Optimization",
+      "risk_level": "medium",
+      "expected_apr": [20, 50],
+      "capital_required": 5000,
+      "description": "Lock AERO for veAERO and maximize voting returns",
+      "setup": [
+        "Calculate optimal lock duration (usually 4 years)",
+        "Lock AERO for veAERO",
+        "Research bribe markets",
+        "Vote for highest bribe/vote ratios",
+        "Claim bribes and fees weekly"
+      ],
+      "advanced_tactics": {
+        "vote_timing": "Submit votes 2-4 hours before epoch end",
+        "bribe_analysis": [
+          "Calculate $/veAERO for each pool",
+          "Factor in pool fees earned",
+          "Diversify across 3-5 pools"
+        ],
+        "coordination": [
+          "Join voter groups for better rates",
+          "Negotiate direct bribes for large positions",
+          "Front-run major vote shifts"
+        ]
+      }
+    },
+    
+    "new_pool_hunter": {
+      "name": "New Pool First Mover",
+      "risk_level": "high",
+      "expected_apr": [50, 500],
+      "capital_required": 1000,
+      "description": "Provide early liquidity to new high-potential pools",
+      "identification": [
+        "Monitor factory for new pools",
+        "Research project fundamentals",
+        "Check team legitimacy",
+        "Verify contract safety",
+        "Assess market demand"
+      ],
+      "execution": [
+        "Be among first 10 LPs",
+        "Start with small position ($500-1000)",
+        "Monitor closely first 48h",
+        "Scale up if metrics positive",
+        "Have exit plan ready"
+      ],
+      "red_flags": [
+        "Anonymous team",
+        "No audit or verification",
+        "Fake volume patterns",
+        "Concentrated holdings",
+        "Copy-paste project"
+      ]
+    },
+    
+    "emission_arbitrage": {
+      "name": "Cross-Pool Emission Arbitrage",
+      "risk_level": "medium",
+      "expected_apr": [30, 80],
+      "capital_required": 3000,
+      "description": "Exploit emission inefficiencies between similar pools",
+      "methodology": [
+        "Identify similar asset pools (e.g., WETH/USDC vs ETH/USDC)",
+        "Compare emission APRs",
+        "If difference >10%, move liquidity",
+        "Account for gas costs and slippage",
+        "Rebalance weekly based on votes"
+      ],
+      "tools_needed": [
+        "Real-time emission tracker",
+        "Gas price monitor",
+        "Automated rebalancing bot",
+        "Vote prediction model"
+      ]
+    },
+    
+    "bribe_and_provide": {
+      "name": "Bribe Your Own Pool",
+      "risk_level": "medium",
+      "expected_apr": [40, 100],
+      "capital_required": 10000,
+      "description": "Bribe votes to your LP position for boosted returns",
+      "calculation": [
+        "LP position value: $10,000",
+        "Expected base APR: 20%",
+        "Bribe cost: $200/week",
+        "Additional emissions: 40% APR",
+        "Net gain: 20% extra APR after bribes"
+      ],
+      "execution_steps": [
+        "Add significant liquidity ($10k+)",
+        "Calculate breakeven bribe amount",
+        "Post competitive bribes",
+        "Harvest boosted emissions",
+        "Reinvest profits"
+      ]
+    },
+    
+    "range_rotation": {
+      "name": "Liquidity Range Rotation",
+      "risk_level": "high", 
+      "expected_apr": [40, 150],
+      "capital_required": 5000,
+      "description": "Actively manage concentrated liquidity positions",
+      "requirements": [
+        "V3 pools when available",
+        "Active monitoring capability",
+        "Understanding of price dynamics",
+        "Low-latency execution"
+      ],
+      "strategy": [
+        "Set tight ranges around current price",
+        "Monitor price movement hourly",
+        "Rebalance when price nears range edge",
+        "Compound fees frequently",
+        "Wider ranges during high volatility"
+      ]
+    }
+  },
+  
+  "risk_management": {
+    "position_sizing": {
+      "conservative": {
+        "max_per_pool": "20% of capital",
+        "stable_allocation": "60%",
+        "volatile_allocation": "40%"
+      },
+      "moderate": {
+        "max_per_pool": "33% of capital",
+        "stable_allocation": "40%",
+        "volatile_allocation": "60%"
+      },
+      "aggressive": {
+        "max_per_pool": "50% of capital",
+        "stable_allocation": "20%",
+        "volatile_allocation": "80%"
+      }
+    },
+    
+    "stop_loss_rules": [
+      "Exit if IL exceeds 10%",
+      "Remove liquidity if APR < 10% for 1 week",
+      "Emergency exit if pool hacked",
+      "Gradual exit if votes declining 3 weeks straight"
+    ],
+    
+    "hedging_strategies": [
+      "Hold 20% in stables always",
+      "Use options to hedge IL if available",
+      "Diversify across uncorrelated pairs",
+      "Keep gas money reserved"
+    ]
+  },
+  
+  "seasonal_patterns": {
+    "epoch_cycles": {
+      "monday_tuesday": {
+        "characteristics": "Lower bribe activity",
+        "opportunity": "Accumulate veAERO cheap"
+      },
+      "wednesday": {
+        "characteristics": "Bribe wars heat up",
+        "opportunity": "Post bribes for next epoch"
+      },
+      "thursday": {
+        "characteristics": "New epoch begins",
+        "opportunity": "Quick LP additions to new winners"
+      },
+      "weekend": {
+        "characteristics": "Lower volume generally",
+        "opportunity": "Compound and rebalance"
+      }
+    },
+    
+    "market_conditions": {
+      "bull_market": {
+        "focus": "Volatile pools with blue chips",
+        "avoid": "Stable-only strategies",
+        "leverage": "Consider 2x on winners"
+      },
+      "bear_market": {
+        "focus": "Stable pools and bribes",
+        "avoid": "New risky projects",
+        "protection": "Increase stable allocation"
+      },
+      "crab_market": {
+        "focus": "Fee generation",
+        "opportunity": "Range-bound strategies",
+        "optimization": "Maximum compounding"
+      }
+    }
+  }
+}

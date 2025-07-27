@@ -10,17 +10,13 @@ from decimal import Decimal
 import json
 import asyncio
 
-from cdp_agentkit_core import AgentKit
-from cdp_agentkit_core.actions import (
-    CDPAction,
-    TransferAction, 
-    TradeAction,
-    DeployTokenAction,
-    MintNFTAction,
-    RegisterBasenameAction,
-    RequestFaucetFundsAction,
-    GetBalanceAction,
-    GetWalletDetailsAction
+from coinbase_agentkit import (
+    AgentKit,
+    AgentKitConfig,
+    CdpEvmWalletProvider,
+    CdpEvmWalletProviderConfig,
+    wallet_action_provider,
+    cdp_api_action_provider
 )
 
 from langchain_core.tools import Tool
@@ -56,24 +52,29 @@ class AthenaAgentKit:
             return
             
         try:
-            # Create AgentKit instance
-            self.agent = AgentKit(
-                name="athena-agent",
+            # Create wallet provider
+            wallet_config = CdpEvmWalletProviderConfig(
                 api_key=self.api_key,
                 api_secret=self.api_secret,
                 network=self.network
             )
             
+            wallet_provider = CdpEvmWalletProvider(wallet_config)
+            
             # Initialize with existing wallet or create new
             if self.wallet_data:
                 logger.info(f"Loading existing wallet: {self.wallet_data}")
-                await self.agent.initialize_wallet(wallet_data=self.wallet_data)
+                # Wallet recovery will be handled by the provider
             else:
                 logger.info("Creating new wallet...")
-                wallet = await self.agent.create_wallet()
-                logger.info(f"Created new wallet: {wallet.default_address}")
-                logger.info(f"⚠️  Save this to .env: AGENT_WALLET_ID={wallet.default_address}")
                 
+            # Create AgentKit instance with providers
+            config = AgentKitConfig(
+                wallet_provider=wallet_provider,
+                action_providers=[wallet_action_provider, cdp_api_action_provider]
+            )
+            
+            self.agent = AgentKit(config)
             self._initialized = True
             logger.info("AgentKit initialized successfully")
             

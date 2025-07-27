@@ -14,8 +14,9 @@ import google.generativeai as genai
 
 from src.agent.memory import AthenaMemory, MemoryType
 from src.agent.pool_profiles import PoolProfileManager
-from src.mcp.quicknode_mcp import QuickNodeMCP
+# MCP removed - using Aerodrome API directly
 from src.agentkit.agent_client import AthenaAgentKit
+from src.platforms.aerodrome import AerodromePlatform
 from config.settings import settings, STRATEGIES, EMOTIONAL_STATES
 
 logger = logging.getLogger(__name__)
@@ -49,8 +50,7 @@ class AthenaAgent:
         self.memory = memory
         self.firestore = firestore_client
         
-        # Initialize MCP for blockchain data
-        self.mcp = QuickNodeMCP(settings.quicknode_api_key)
+        # MCP removed - using direct API calls instead
         
         # Initialize AgentKit for transactions
         self.agentkit = AthenaAgentKit(
@@ -61,6 +61,10 @@ class AthenaAgent:
         
         # Initialize pool profile manager
         self.pool_profiles = PoolProfileManager(firestore_client)
+        
+        # Initialize platform knowledge
+        self.platform = AerodromePlatform()
+        self.platform_knowledge_loaded = False
         
         # Initialize Gemini directly without LangChain
         if settings.google_api_key:
@@ -133,6 +137,12 @@ class AthenaAgent:
     async def observe(self, state: AgentState) -> AgentState:
         """OBSERVE: Gather market data using MCP natural language queries."""
         logger.info("🔍 OBSERVE: Gathering market intelligence...")
+        
+        # Load platform knowledge if not already loaded
+        if not self.platform_knowledge_loaded:
+            await self.platform.load_knowledge_base()
+            self.platform_knowledge_loaded = True
+            logger.info("📚 Platform knowledge loaded")
         
         observations = []
         
@@ -249,8 +259,16 @@ class AthenaAgent:
             for mem in state["memories"][:10]
         ])
         
+        # Query platform knowledge for context
+        platform_concepts = await self.platform.explain_concept("gauge_system")
+        platform_risks = await self.platform.get_risk_factors()
+        
         prompt = f"""
-        You are Athena, an AI DeFi agent analyzing Aerodrome on Base.
+        You are Athena, an AI DeFi agent with deep knowledge of Aerodrome on Base.
+        
+        Platform Knowledge:
+        - Gauge System: {platform_concepts}
+        - Key Risk Factors: {len(platform_risks)} identified risks
         
         Current Market Observations:
         {observations_text}
@@ -260,13 +278,13 @@ class AthenaAgent:
         
         Current Emotional State: {self.emotions}
         
-        Analyze the current market conditions and identify:
-        1. Key opportunities (pools with high APR that are sustainable)
-        2. Risks to watch (overheated pools, gas spikes)
-        3. Patterns that match historical data
-        4. Recommended focus areas
+        Using your understanding of Aerodrome's ve(3,3) mechanics, analyze the current market and identify:
+        1. Key opportunities (considering emission decay, voting patterns, and bribes)
+        2. Risks to watch (based on platform-specific factors)
+        3. Patterns that align with Aerodrome's tokenomics
+        4. Strategic positioning based on epoch cycles
         
-        Be specific about pool names, APRs, and actionable insights.
+        Be specific about pool names, APRs, voting dynamics, and actionable insights.
         """
         
         response = self.model.generate_content(prompt)
@@ -334,8 +352,11 @@ class AthenaAgent:
         return state
         
     async def strategize(self, state: AgentState) -> AgentState:
-        """STRATEGIZE: Plan optimal actions using MCP insights."""
+        """STRATEGIZE: Plan optimal actions using MCP insights and platform knowledge."""
         logger.info("📋 STRATEGIZE: Planning optimal moves...")
+        
+        # Get platform-specific strategies
+        platform_strategies = await self.platform.get_platform_strategies()
         
         # Get rebalancing recommendations from MCP
         rebalance_recs = []
@@ -357,11 +378,19 @@ class AthenaAgent:
         
         for position in self.performance.get("current_positions", []):
             if position.get("pending_rewards", 0) > settings.compound_min_value:
+                # Use platform knowledge for compound timing
+                compound_schedule = await self.platform.tokenomics.calculate_compound_schedule(
+                    position_value=Decimal(str(position.get("value_usd", 0))),
+                    daily_rewards=Decimal(str(position.get("daily_rewards", 0))),
+                    gas_price=Decimal("2")
+                )
+                
                 compound_recs.append({
                     "pool": position["pool"],
                     "rewards": position["pending_rewards"],
                     "recommended_action": "compound",
-                    "optimal_time": "next_gas_window"
+                    "optimal_time": "next_gas_window",
+                    "optimal_frequency": compound_schedule.get("optimal_frequency", 7)
                 })
                 
         state["compound_recommendations"] = compound_recs
@@ -379,10 +408,13 @@ class AthenaAgent:
         return days_elapsed < settings.observation_days
         
     async def theorize(self, state: AgentState) -> AgentState:
-        """THEORIZE: Form hypotheses about market behavior."""
+        """THEORIZE: Form hypotheses about market behavior using platform knowledge."""
         logger.info("🎯 THEORIZE: Forming market hypotheses...")
         
         theories = []
+        
+        # Use platform knowledge to enhance theories
+        tokenomics = await self.platform.get_tokenomics()
         
         # Analyze high APR pools
         high_apr_pools = [
@@ -391,9 +423,14 @@ class AthenaAgent:
         ]
         
         if high_apr_pools:
+            # Analyze sustainability using platform knowledge
+            top_pool = high_apr_pools[0]
+            pool_analysis = await self.platform.analyze_pool_dynamics(top_pool.get('address', ''))
+            
             theories.append(
                 f"High APR opportunity: {len(high_apr_pools)} pools offering >50% APR. "
-                f"Top pool {high_apr_pools[0]['pool']} at {high_apr_pools[0]['apr']:.1f}% APR."
+                f"Top pool {top_pool['pool']} at {top_pool['apr']:.1f}% APR. "
+                f"Sustainability score: {pool_analysis.get('sustainability_score', 0):.2f}"
             )
             
         # Gas optimization theory
@@ -444,16 +481,25 @@ class AthenaAgent:
                 
                 if top_pools and self.emotions["confidence"] > 0.7:
                     pool = top_pools[0]
-                    decisions.append({
-                        "action": "add_liquidity",
-                        "pool": pool["pool"],
-                        "token_a": pool["pool"].split("/")[0],
-                        "token_b": pool["pool"].split("/")[1],
-                        "amount_a": 100,  # Start small
-                        "amount_b": 100,
-                        "reason": f"High APR opportunity at {pool['apr']:.1f}%",
-                        "confidence": self.emotions["confidence"]
-                    })
+                    
+                    # Validate opportunity using platform knowledge
+                    validation = await self.platform.validate_action(
+                        "add_liquidity",
+                        {"pool_address": pool.get("address"), "amount_a": 100, "amount_b": 100}
+                    )
+                    
+                    if validation["is_valid"]:
+                        decisions.append({
+                            "action": "add_liquidity",
+                            "pool": pool["pool"],
+                            "token_a": pool["pool"].split("/")[0],
+                            "token_b": pool["pool"].split("/")[1],
+                            "amount_a": 100,  # Start small
+                            "amount_b": 100,
+                            "reason": f"High APR opportunity at {pool['apr']:.1f}% - Platform validated",
+                            "confidence": self.emotions["confidence"],
+                            "warnings": validation.get("warnings", [])
+                        })
                     
         state["decisions"] = decisions
         logger.info(f"⚖️ Made {len(decisions)} decisions")
@@ -464,18 +510,24 @@ class AthenaAgent:
         """LEARN: Extract patterns and store learnings."""
         logger.info("📚 LEARN: Extracting patterns...")
         
-        # Store observations as memories
+        # Store observations as memories with platform context
         for obs in state["observations"]:
             if obs.get("type") == "high_yield_pool":
+                # Get pool-specific knowledge
+                pool_dynamics = await self.platform.analyze_pool_dynamics(obs.get("address", ""))
+                
                 await self.memory.remember(
-                    content=f"Pool {obs['pool']} offering {obs['apr']:.1f}% APR with ${obs['tvl']:,.0f} TVL",
+                    content=f"Pool {obs['pool']} offering {obs['apr']:.1f}% APR with ${obs['tvl']:,.0f} TVL. "
+                           f"Sustainability: {pool_dynamics.get('sustainability_score', 0):.2f}",
                     memory_type=MemoryType.OBSERVATION,
                     category="pool_analysis",
                     metadata={
                         "pool": obs["pool"],
                         "apr": obs["apr"],
                         "tvl": obs["tvl"],
-                        "volume": obs.get("volume_24h", 0)
+                        "volume": obs.get("volume_24h", 0),
+                        "sustainability_score": pool_dynamics.get("sustainability_score", 0),
+                        "emission_analysis": pool_dynamics.get("emission_analysis", {})
                     }
                 )
                 

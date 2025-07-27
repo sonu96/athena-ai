@@ -1,4 +1,17 @@
-from .gas_monitor import GasMonitor
-from .pool_scanner import PoolScanner
+# Collectors module
+try:
+    from .gas_monitor import GasMonitor
+except ImportError:
+    GasMonitor = None
+    
+try:
+    from .pool_scanner import PoolScanner
+except ImportError:
+    PoolScanner = None
+    
+try:
+    from .quicknode_pool_scanner import QuickNodePoolScanner
+except ImportError:
+    QuickNodePoolScanner = None
 
-__all__ = ["GasMonitor", "PoolScanner"]
+__all__ = ["GasMonitor", "PoolScanner", "QuickNodePoolScanner"]

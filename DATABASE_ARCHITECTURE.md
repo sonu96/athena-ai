@@ -489,11 +489,47 @@ gas_patterns = await memory.recall(
 - Cached pool profiles for frequent access
 - Async operations for non-blocking execution
 
-**Data Retention:**
-- Recent memories (< 24h) kept in fast access
-- Historical patterns aggregated and summarized
-- Low-confidence memories periodically pruned
-- Pool metrics aggregated hourly/daily
+**Data Retention Strategy:**
+
+### Tiered Storage System
+```
+├── Hot Tier (0-24 hours)
+│   ├── Storage: Mem0 vector database
+│   ├── Full memory details with metadata
+│   ├── Instant access for active trading
+│   └── No compression
+│
+├── Warm Tier (1-7 days)
+│   ├── Storage: Firestore aggregated
+│   ├── Patterns extracted from observations
+│   ├── Metadata compressed to essential fields
+│   └── 5-minute cache for frequent access
+│
+├── Cold Tier (7-30 days)
+│   ├── Storage: Firestore summaries
+│   ├── Statistical aggregates only
+│   ├── Daily rollups of metrics
+│   └── Accessed for historical analysis
+│
+└── Archive (>30 days)
+    ├── Storage: Google Cloud Storage
+    ├── Patterns and learnings only
+    ├── Compressed JSON format
+    └── Monthly access for model training
+```
+
+### Pruning Rules
+1. **Low Confidence Removal**: Memories with confidence < 0.3 deleted after 48h
+2. **Pattern Deduplication**: Similar patterns (>0.9 cosine similarity) merged daily
+3. **Category Quotas**: Enforced hourly to prevent memory explosion
+4. **Metadata Compression**: Non-essential fields removed after 24h
+
+### Memory Lifecycle
+```
+New Memory → Hot Tier → Pattern Extraction → Warm Tier → Aggregation → Cold Tier → Archive
+     ↓                          ↓                    ↓                  ↓            ↓
+  Full Detail            Confidence Check      Deduplicate        Summarize    Patterns Only
+```
 
 ## Pattern Learning System
 
@@ -576,19 +612,49 @@ Patterns evolve through:
 
 ## Performance Considerations
 
-### 1. Query Performance
+### 1. Query Performance Optimization
 
-**Mem0 Optimization:**
-- Vector indices for fast similarity search
-- Metadata filtering before vector search
-- Result caching for frequent queries
-- Batch operations for multiple recalls
+**Mem0 Query Strategy:**
+```python
+# Optimized query flow
+1. Bloom Filter Check → 80% reduction in unnecessary queries
+2. Metadata Index Query → Filter by category/pool/time
+3. Parallel Vector Search → Batch similar queries
+4. Result Cache → 5-minute TTL for frequent patterns
+5. Semantic Hash Cache → 24h TTL for LLM responses
+```
 
-**Firestore Optimization:**
-- Composite indices for complex queries
-- Query result pagination
-- Denormalized data for read performance
-- Collection group queries for cross-collection searches
+**Cache Architecture:**
+- **Pattern Cache**: 1,000 entries, 1h TTL
+- **Query Cache**: 500 entries, 5min TTL  
+- **Pool Cache**: 200 entries, 10min TTL
+- **LLM Response Cache**: 1,000 entries, 24h TTL
+
+**Firestore Query Optimization:**
+```
+Query Budget System
+├── Read Budget: 1,000/minute
+├── Write Budget: 100/minute
+├── Composite Indices
+│   ├── (timestamp, type, confidence)
+│   ├── (pool, category, timestamp)
+│   └── (category, confidence, timestamp)
+└── Pagination: 100 items/page
+```
+
+### 2. Write Optimization
+
+**Firestore Write Batching:**
+```
+Write Buffer
+├── Buffer Size: 500 writes
+├── Flush Interval: 60 seconds
+├── Aggregation Rules
+│   ├── Pool metrics: Aggregate to 15-min intervals
+│   ├── Gas prices: Aggregate to 5-min intervals
+│   └── Patterns: Deduplicate before writing
+└── Cost Tracking: Monitor writes/minute
+```
 
 ### 2. Storage Efficiency
 

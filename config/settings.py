@@ -167,6 +167,59 @@ class Settings(BaseSettings):
     max_memories_per_cycle: int = Field(default=50, env="MAX_MEMORIES_PER_CYCLE")  # Prevent memory overflow
     pool_profile_update_interval: int = Field(default=3600, env="POOL_PROFILE_UPDATE_INTERVAL")  # Update profiles every hour
     
+    # Scalability & Performance Configuration
+    memory_retention_days: int = Field(default=30, env="MEMORY_RETENTION_DAYS")
+    memory_prune_interval_hours: int = Field(default=1, env="MEMORY_PRUNE_INTERVAL_HOURS")
+    memory_confidence_threshold: float = Field(default=0.3, env="MEMORY_CONFIDENCE_THRESHOLD")
+    memory_similarity_threshold: float = Field(default=0.9, env="MEMORY_SIMILARITY_THRESHOLD")
+    
+    # Memory Category Limits
+    max_memories_observation: int = Field(default=1000, env="MAX_MEMORIES_OBSERVATION")
+    max_memories_pattern: int = Field(default=500, env="MAX_MEMORIES_PATTERN")
+    max_memories_pool_behavior: int = Field(default=200, env="MAX_MEMORIES_POOL_BEHAVIOR")
+    max_memories_correlation: int = Field(default=100, env="MAX_MEMORIES_CORRELATION")
+    
+    # LLM Optimization
+    llm_cache_ttl_hours: int = Field(default=24, env="LLM_CACHE_TTL_HOURS")
+    llm_cache_size: int = Field(default=1000, env="LLM_CACHE_SIZE")
+    llm_timeout_seconds: int = Field(default=30, env="LLM_TIMEOUT_SECONDS")
+    llm_batch_operations: bool = Field(default=True, env="LLM_BATCH_OPERATIONS")
+    
+    # Firestore Optimization
+    firestore_batch_size: int = Field(default=500, env="FIRESTORE_BATCH_SIZE")
+    firestore_flush_interval_seconds: int = Field(default=60, env="FIRESTORE_FLUSH_INTERVAL_SECONDS")
+    firestore_read_cache_ttl: int = Field(default=300, env="FIRESTORE_READ_CACHE_TTL")
+    firestore_max_writes_per_minute: int = Field(default=100, env="FIRESTORE_MAX_WRITES_PER_MINUTE")
+    
+    # Risk Management Configuration
+    risk_portfolio_limit_percent: float = Field(default=0.2, env="RISK_PORTFOLIO_LIMIT_PERCENT")
+    risk_new_pool_limit_usd: float = Field(default=500.0, env="RISK_NEW_POOL_LIMIT_USD")
+    risk_max_token_concentration: float = Field(default=0.5, env="RISK_MAX_TOKEN_CONCENTRATION")
+    risk_max_correlation_exposure: float = Field(default=0.4, env="RISK_MAX_CORRELATION_EXPOSURE")
+    
+    # Circuit Breaker Configuration
+    circuit_breaker_loss_threshold: float = Field(default=-0.05, env="CIRCUIT_BREAKER_LOSS_THRESHOLD")
+    circuit_breaker_drawdown_threshold: float = Field(default=-0.10, env="CIRCUIT_BREAKER_DRAWDOWN_THRESHOLD")
+    circuit_breaker_gas_multiplier: float = Field(default=3.0, env="CIRCUIT_BREAKER_GAS_MULTIPLIER")
+    circuit_breaker_cooldown_hours: int = Field(default=2, env="CIRCUIT_BREAKER_COOLDOWN_HOURS")
+    
+    # Gas Protection
+    max_gas_price_gwei: float = Field(default=100.0, env="MAX_GAS_PRICE_GWEI")
+    gas_daily_budget_usd: float = Field(default=50.0, env="GAS_DAILY_BUDGET_USD")
+    gas_manipulation_threshold: float = Field(default=3.0, env="GAS_MANIPULATION_THRESHOLD")
+    
+    # Performance Monitoring
+    query_cache_size: int = Field(default=500, env="QUERY_CACHE_SIZE")
+    pattern_cache_size: int = Field(default=1000, env="PATTERN_CACHE_SIZE")
+    pool_cache_size: int = Field(default=200, env="POOL_CACHE_SIZE")
+    cache_hit_rate_target: float = Field(default=0.7, env="CACHE_HIT_RATE_TARGET")
+    
+    # Disaster Recovery
+    checkpoint_interval_hours: int = Field(default=1, env="CHECKPOINT_INTERVAL_HOURS")
+    checkpoint_retention_days: int = Field(default=7, env="CHECKPOINT_RETENTION_DAYS")
+    recovery_confidence_factor: float = Field(default=0.5, env="RECOVERY_CONFIDENCE_FACTOR")
+    health_check_interval_seconds: int = Field(default=60, env="HEALTH_CHECK_INTERVAL_SECONDS")
+    
     # QuickNode API Configuration
     quicknode_api_key: Optional[str] = Field(None, env="QUICKNODE_API_KEY")
     quicknode_endpoint: Optional[str] = Field(None, env="QUICKNODE_ENDPOINT")

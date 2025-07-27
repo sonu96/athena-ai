@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Athena is a 24/7 autonomous DeFi agent for Aerodrome on Base blockchain. It uses LangGraph for AI orchestration, Google Cloud Platform for infrastructure, QuickNode MCP for blockchain data queries, and Coinbase AgentKit for AI-native transaction execution.
+Athena is a 24/7 autonomous DeFi agent for Aerodrome on Base blockchain. It uses LangGraph for AI orchestration, Google Cloud Platform for infrastructure, QuickNode's Aerodrome API for market data, and Coinbase AgentKit for AI-native transaction execution.
 
 ## Common Development Commands
 
@@ -58,6 +58,15 @@ gcloud logging read "resource.type=cloud_run_revision AND resource.labels.servic
 
 ## High-Level Architecture
 
+### Platform Knowledge System (NEW)
+Athena now incorporates deep platform understanding:
+- **Knowledge Base**: Loads documentation, whitepapers, and strategies
+- **Tokenomics Model**: Understands emission schedules and voting dynamics
+- **Strategy Validation**: Validates actions against platform rules
+- **Opportunity Discovery**: Finds opportunities based on platform mechanics
+
+See `src/platforms/` for implementation and `docs/PLATFORM_KNOWLEDGE.md` for details.
+
 ### Core Components
 
 1. **Agent System** (`src/agent/`)
@@ -72,10 +81,10 @@ gcloud logging read "resource.type=cloud_run_revision AND resource.labels.servic
    - Pattern recognition and learning capabilities
 
 3. **Blockchain Integration**
-   - **QuickNode MCP** (`src/mcp/`): Natural language blockchain queries
+   - **QuickNode Aerodrome API** (`src/collectors/aerodrome_api_scanner.py`): Market data via specialized API endpoints
    - **Coinbase AgentKit** (`src/agentkit/`): AI-native transaction execution
+   - **CDP RPC**: Optional authenticated RPC endpoint (configured but primarily for transactions)
    - Secure wallet management using existing CDP credentials
-   - Native Aerodrome protocol operations
 
 4. **Data Collection Pipeline** (`src/collectors/`)
    - `pool_scanner.py`: Monitors Aerodrome pools
@@ -122,25 +131,24 @@ gcloud logging read "resource.type=cloud_run_revision AND resource.labels.servic
 4. Update decision logic in `src/agent/core.py`
 
 ### Blockchain Interactions
-- Use QuickNode MCP for all data queries (pools, prices, analytics)
+- Use QuickNode Aerodrome API for pool data queries (APR, TVL, volume)
 - Use Coinbase AgentKit for all transactions
-- Natural language interfaces reduce complexity by 90%
-- Automatic error handling and retry logic built-in
+- CDP RPC available as authenticated endpoint but not required for data collection
+- Note: Gauge reward data collection is not currently implemented
 
 ### Blockchain Integration
 
-#### QuickNode MCP (Data Queries)
+#### QuickNode Aerodrome API (Data Queries)
 ```python
-from src.mcp.quicknode_mcp import QuickNodeMCP
+from src.collectors.aerodrome_api_scanner import AerodromeAPIScanner
 
-# Initialize MCP client
-mcp = QuickNodeMCP(api_key="your_quicknode_api_key")
-await mcp.initialize()
+# Initialize API scanner
+scanner = AerodromeAPIScanner(memory)
 
-# Natural language queries
-pools = await mcp.query("Find high APR pools on Aerodrome")
-gas_timing = await mcp.optimize_gas_timing()
-opportunities = await mcp.analyze_rebalance_opportunities(wallet_address)
+# API queries for pool data
+pools = await scanner.scan_pools()  # Get pools via QuickNode's Aerodrome API
+pool_data = await scanner.get_pool_details(pool_address)  # Specific pool data
+# Note: Gas prices use standard RPC calls, gauge rewards not implemented
 ```
 
 #### Coinbase AgentKit (Transactions)
@@ -162,10 +170,11 @@ tx = await agentkit.add_liquidity("USDC", "WETH", amount_a=1000, amount_b=0.5)
 ```
 
 #### Configuration
-- **QuickNode API Key**: Required for blockchain data access
-- **CDP API Key/Secret**: Reused by AgentKit for wallet operations
+- **QuickNode Endpoint**: API endpoint for Aerodrome data (uses addon/1051/v1)
+- **CDP API Key/Secret**: Used by AgentKit for wallet operations
+- **CDP RPC URL**: Optional authenticated RPC (constructed but not actively used)
 - **Wallet Management**: AgentKit handles wallet creation/recovery
-- No direct RPC calls needed - all handled by MCP and AgentKit
+- API calls for pool data, AgentKit for transactions
 
 ### API Development
 - Follow FastAPI patterns
@@ -180,8 +189,9 @@ tx = await agentkit.add_liquidity("USDC", "WETH", amount_a=1000, amount_b=0.5)
 - Monitor costs via GCP billing alerts
 - Check logs regularly for agent decisions
 - AgentKit uses existing CDP credentials - no new registration needed
-- QuickNode MCP provides natural language queries
-- 90% less blockchain code compared to direct SDK usage
+- QuickNode Aerodrome API provides specialized pool data endpoints
+- CDP RPC configured but primarily for transaction execution
+- **Important**: Gauge reward data collection is NOT currently implemented
 
 ## Recent Updates (July 2025)
 
@@ -278,11 +288,11 @@ correlations = await memory.get_cross_pool_correlations()
 Athena now collects real market data from Aerodrome - NO HARDCODED VALUES:
 
 #### Components
-1. **Gauge Reader** (`src/aerodrome/gauge_reader.py`)
-   - Reads AERO emission rates from gauge contracts
-   - Calculates emission APR based on TVL
-   - Caches gauge addresses for efficiency
-   - Returns 0 APR if gauge data unavailable (no fallback)
+1. **Gauge System Knowledge** (`src/platforms/knowledge/aerodrome/gauge_system.json`)
+   - Contains gauge system information as knowledge base data
+   - **Note**: Direct gauge reward collection is NOT currently implemented
+   - Pool APR data comes from QuickNode Aerodrome API, not gauge contracts
+   - Future implementation would need gauge contract integration
 
 2. **Event Monitor** (`src/aerodrome/event_monitor.py`)
    - Tracks Swap events for real volume data
@@ -298,13 +308,14 @@ Athena now collects real market data from Aerodrome - NO HARDCODED VALUES:
    - Calculates fee APR from actual 24h volume only
    - Stores only verified data in memory
 
-#### New Memory Categories
-- `gauge_emissions`: AERO emission rates and patterns
-- `volume_tracking`: Real swap volumes from events
+#### Memory Categories (Current Implementation)
+- `pool_analysis`: Pool data from QuickNode Aerodrome API
+- `volume_tracking`: Volume data from API (not events currently)
 - `arbitrage_opportunity`: Detected price imbalances
 - `new_pool`: New pool discoveries
 - `apr_anomaly`: Unusual APR changes
-- `fee_collection`: Fee event tracking
+- `fee_collection`: Fee tracking (planned, not implemented)
+- **Note**: `gauge_emissions` category exists but gauge data not actively collected
 
 #### Testing Real Data
 ```bash
@@ -312,14 +323,39 @@ Athena now collects real market data from Aerodrome - NO HARDCODED VALUES:
 python scripts/test_real_data.py
 ```
 
-#### Important: Real Data Requirements
-- **Event Monitor**: Needs time to collect historical events (may show 0 initially)
-- **Gauge Reader**: Requires active gauge contracts (some pools may not have gauges)
-- **AERO Price**: Fetched from AERO/USDC pool in real-time
-- **No Fallbacks**: If real data unavailable, values will be 0 (not estimated)
+#### Current Data Sources and Limitations
+- **QuickNode Aerodrome API**: Primary source for pool APR, TVL, and volume data
+- **Event Monitoring**: Not currently implemented (planned feature)
+- **Gauge Data**: Knowledge base only - direct gauge contract reading not implemented
+- **AERO Price**: Fetched via API, not direct contract calls
+- **Transaction Execution**: Via AgentKit using CDP credentials
+
+## Current Implementation Status (Updated July 2025)
+
+### What's Currently Working
+- ✅ QuickNode Aerodrome API integration for pool data
+- ✅ Coinbase AgentKit for transaction execution  
+- ✅ Platform knowledge system with Aerodrome documentation
+- ✅ Memory system with Firestore persistence
+- ✅ Observation mode and pattern recognition
+- ✅ Risk management and circuit breakers
+
+### What's Planned/In Development
+- ⏳ Direct gauge contract reading for emission data
+- ⏳ Event monitoring for real-time volume tracking
+- ⏳ Direct Web3 integration for custom contract calls
+- ⏳ Real-time fee collection monitoring
+
+### Data Flow Architecture
+```
+QuickNode Aerodrome API → Pool Data (APR, TVL, Volume)
+Platform Knowledge Base → Strategy Validation
+Coinbase AgentKit → Transaction Execution
+Firestore → Memory & State Persistence
+```
 
 ### Known Issues
 - Some Aerodrome V2 pools don't implement standard Uniswap V2 interface
-- getReserves() may revert - system automatically falls back to storage reading
+- Gauge emission data relies on API rather than direct contract calls
+- Event monitoring not yet implemented for real-time volume tracking
 - Mem0 API may show "free plan" errors if API key is not properly configured
-- Event monitoring requires authenticated RPC for best performance

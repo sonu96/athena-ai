@@ -21,7 +21,7 @@ Athena AI is a 24/7 autonomous DeFi agent that operates on the Base blockchain, 
    - Performance tracking and strategy optimization
 
 3. **Blockchain Integration**
-   - **QuickNode MCP**: Natural language blockchain queries
+   - **QuickNode RPC**: Direct blockchain data access via Web3
    - **Coinbase AgentKit**: AI-native transaction execution
    - Secure wallet management using existing CDP credentials
    - Native Base blockchain interactions
@@ -122,7 +122,7 @@ Athena tracks:
 
 - **AI/ML**: LangGraph, LangChain, Google Gemini 1.5 Flash
 - **Memory**: Mem0 (cloud API or local fallback) + Google Firestore
-- **Blockchain**: QuickNode MCP (data) + Coinbase AgentKit (execution)
+- **Blockchain**: QuickNode RPC (data) + Coinbase AgentKit (execution)
 - **Backend**: FastAPI with WebSockets
 - **Monitoring**: LangSmith for observability
 - **Infrastructure**: Docker, Google Cloud Platform

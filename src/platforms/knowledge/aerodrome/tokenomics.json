@@ -1,0 +1,203 @@
+{
+  "token_details": {
+    "name": "AERO",
+    "initial_supply": 500000000,
+    "current_supply": "Variable based on emissions",
+    "contract_address": "0x940181a94A35A4569E4529A3CDfB74e38FD98631",
+    "decimals": 18,
+    "chain": "Base"
+  },
+  
+  "emission_model": {
+    "type": "Exponential decay",
+    "initial_weekly_emission": 10000000,
+    "decay_rate": 0.98,
+    "decay_frequency": "Weekly",
+    "formula": "week_n_emission = week_1_emission × (0.98)^(n-1)",
+    
+    "distribution_split": {
+      "liquidity_providers": 0.67,
+      "veaero_holders": 0.33
+    },
+    
+    "emission_projections": {
+      "year_1_total": "~450M AERO",
+      "year_2_total": "~220M AERO", 
+      "year_3_total": "~108M AERO",
+      "terminal_state": "Approaches zero asymptotically"
+    }
+  },
+  
+  "veaero_mechanics": {
+    "lock_parameters": {
+      "minimum_lock": 7,
+      "maximum_lock": 1460,
+      "unit": "days",
+      "linear_scaling": true
+    },
+    
+    "voting_power_calculation": {
+      "formula": "veAERO = AERO × (lock_days / max_lock_days)",
+      "example": {
+        "aero_locked": 1000,
+        "lock_duration": "4 years",
+        "veaero_received": 1000,
+        "lock_duration_6m": "6 months", 
+        "veaero_received_6m": 125
+      }
+    },
+    
+    "decay_mechanics": {
+      "type": "Linear decay",
+      "formula": "remaining_veAERO = initial_veAERO × (time_left / total_lock_time)",
+      "relock_allowed": true,
+      "extend_lock": "Can extend to maintain power"
+    },
+    
+    "benefits": {
+      "voting_rights": "Direct emissions to gauges",
+      "fee_share": "Earn trading fees from voted pools",
+      "bribes": "Receive bribes for votes",
+      "rebase": "33% of emissions weekly",
+      "boost": "Up to 2.5x on LP rewards"
+    }
+  },
+  
+  "value_flows": {
+    "trading_fees": {
+      "stable_pools": 0.0001,
+      "volatile_pools": 0.003,
+      "distribution": {
+        "lp_providers": 1.0,
+        "protocol": 0.0
+      }
+    },
+    
+    "emission_value": {
+      "weekly_emissions": "Calculated by decay",
+      "lp_allocation": "67% by gauge votes",
+      "veaero_allocation": "33% pro-rata rebase"
+    },
+    
+    "bribe_economy": {
+      "flow": "External protocols → veAERO voters",
+      "claiming": "After epoch ends",
+      "no_protocol_cut": true,
+      "permissionless": true
+    }
+  },
+  
+  "economic_incentives": {
+    "for_lps": {
+      "sources": [
+        "Trading fees (100%)",
+        "AERO emissions (base rate)",
+        "Boosted emissions (with veAERO)"
+      ],
+      "optimization": "Lock AERO for boost"
+    },
+    
+    "for_lockers": {
+      "sources": [
+        "Rebase (33% of emissions)",
+        "Bribes from protocols",
+        "Trading fees from voted pools"
+      ],
+      "optimization": "Lock maximum duration"
+    },
+    
+    "for_protocols": {
+      "benefits": [
+        "Direct liquidity via bribes",
+        "No permission needed",
+        "Predictable costs"
+      ],
+      "strategy": "Bribe efficiently for votes"
+    }
+  },
+  
+  "game_theory": {
+    "nash_equilibrium": {
+      "description": "Optimal strategy is maximum lock",
+      "reasoning": [
+        "Maximum voting power",
+        "Highest rebase share",
+        "Best bribe allocation",
+        "Compound advantages"
+      ]
+    },
+    
+    "prisoner_dilemma": {
+      "cooperation": "Everyone locks → High AERO value",
+      "defection": "Sell pressure → Lower returns",
+      "resolution": "Incentives favor cooperation"
+    },
+    
+    "flywheel_effects": [
+      "More locks → Higher AERO price",
+      "Higher price → More bribes",
+      "More bribes → More locks",
+      "Positive feedback loop"
+    ]
+  },
+  
+  "comparative_analysis": {
+    "vs_curve": {
+      "similarities": [
+        "Vote-escrow model",
+        "Gauge voting system",
+        "Boost mechanics"
+      ],
+      "differences": [
+        "No admin control",
+        "100% fees to users",
+        "Faster iteration"
+      ]
+    },
+    
+    "vs_uniswap": {
+      "advantages": [
+        "Native incentives",
+        "Directed liquidity",
+        "Sustainable yields"
+      ],
+      "tradeoffs": [
+        "More complex",
+        "Higher gas for claims"
+      ]
+    }
+  },
+  
+  "risk_factors": {
+    "inflation_risk": {
+      "description": "Token supply increases over time",
+      "mitigation": "Exponential decay reduces impact"
+    },
+    
+    "liquidity_fragmentation": {
+      "description": "Votes spread thin across many pools",
+      "mitigation": "Market forces concentrate on productive pools"
+    },
+    
+    "vote_buying": {
+      "description": "Bribes may distort optimal allocation",
+      "mitigation": "Voters incentivized for profitable pools"
+    }
+  },
+  
+  "future_developments": {
+    "planned_features": [
+      "Concentrated liquidity (V3)",
+      "Cross-chain expansion",
+      "Advanced routing",
+      "veAERO delegation"
+    ],
+    
+    "ecosystem_growth": [
+      "Lending protocols integration",
+      "Options on AERO",
+      "Liquid staking derivatives",
+      "Automated strategies"
+    ]
+  }
+}

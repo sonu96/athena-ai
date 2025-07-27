@@ -1,0 +1,572 @@
+[
+  {
+    "address": "0xBC227DE4E655D5d51e7e2a36B7478a8FD89EDdB6",
+    "symbol": "vAMM-POLICE/\u24c1",
+    "factory": "0x420DD381b31aEf6683db6B902084cB0FFECe40Da",
+    "type_info": {
+      "type": -1,
+      "is_stable": false,
+      "is_cl": false,
+      "label": "volatile",
+      "decimals": 18
+    },
+    "tokens": {
+      "token0": {
+        "address": "0x0Ecb04fD79Ca0549C449F48E233e7aC9a6412F8A",
+        "symbol": "POLICE",
+        "decimals": 18
+      },
+      "token1": {
+        "address": "0x842e34D551E6ad5560AD45dfE4aa8703F1996Ba8",
+        "symbol": "\u24c1",
+        "decimals": 18
+      }
+    },
+    "liquidity": {
+      "tvl": 3.673718053141263e+23,
+      "total_supply": 711711000000000000000,
+      "reserves": {
+        "token0_amount": 5.277222e-12,
+        "token1_amount": 9.59847214908394e+16
+      }
+    },
+    "trading": {
+      "volume_24h": 6.109993976382262e+23,
+      "fees_24h": 1.8329981929146787e+21,
+      "apr": 0,
+      "pool_fee_bps": 30,
+      "pool_fee_percentage": 0.3,
+      "volume_breakdown": {
+        "token0_volume": 37.18794983089368,
+        "token1_volume": 1.5963829059562477e+17
+      },
+      "fees_breakdown": {
+        "token0_fees": 0.11156384949268101,
+        "token1_fees": 478914871786874.25
+      }
+    },
+    "gauge": {
+      "total_supply": 0,
+      "emissions_per_second": 0,
+      "weekly_emissions": 0
+    },
+    "contracts": {
+      "nfpm": "0x0000000000000000000000000000000000000000",
+      "alm": "0x0000000000000000000000000000000000000000"
+    },
+    "voting": null
+  },
+  {
+    "address": "0xfB3E8d5104217B4d42FDfC8F4347c096EC6DA9eb",
+    "symbol": "vAMM-\u1e56/cbBTC",
+    "factory": "0x420DD381b31aEf6683db6B902084cB0FFECe40Da",
+    "type_info": {
+      "type": -1,
+      "is_stable": false,
+      "is_cl": false,
+      "label": "volatile",
+      "decimals": 18
+    },
+    "tokens": {
+      "token0": {
+        "address": "0xb444314D43f24b07C6650cd68Ef7A305ed32b66b",
+        "symbol": "\u1e56",
+        "decimals": 18
+      },
+      "token1": {
+        "address": "0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf",
+        "symbol": "cbBTC",
+        "decimals": 8
+      }
+    },
+    "liquidity": {
+      "tvl": 3.492345746843341e+23,
+      "total_supply": 1000000,
+      "reserves": {
+        "token0_amount": 9.124593368667693e+16,
+        "token1_amount": 1e-08
+      }
+    },
+    "trading": {
+      "volume_24h": 5.512084128245889e+23,
+      "fees_24h": 1.6536252384737666e+21,
+      "apr": 0,
+      "pool_fee_bps": 30,
+      "pool_fee_percentage": 0.3,
+      "volume_breakdown": {
+        "token0_volume": 1.4401645750450675e+17,
+        "token1_volume": 0.0
+      },
+      "fees_breakdown": {
+        "token0_fees": 432049372513520.2,
+        "token1_fees": 0.0
+      }
+    },
+    "gauge": {
+      "total_supply": 0,
+      "emissions_per_second": 0,
+      "weekly_emissions": 0
+    },
+    "contracts": {
+      "nfpm": "0x0000000000000000000000000000000000000000",
+      "alm": "0x0000000000000000000000000000000000000000"
+    },
+    "voting": null
+  },
+  {
+    "address": "0x98f25F25A6B9490326D7eB3217B0cf8bc08a1126",
+    "symbol": "vAMM-USBA/\u1e56",
+    "factory": "0x420DD381b31aEf6683db6B902084cB0FFECe40Da",
+    "type_info": {
+      "type": -1,
+      "is_stable": false,
+      "is_cl": false,
+      "label": "volatile",
+      "decimals": 18
+    },
+    "tokens": {
+      "token0": {
+        "address": "0x52fA342C288060b37776caDF98D8f81C57EBA2B9",
+        "symbol": "USBA",
+        "decimals": 18
+      },
+      "token1": {
+        "address": "0xb444314D43f24b07C6650cd68Ef7A305ed32b66b",
+        "symbol": "\u1e56",
+        "decimals": 18
+      }
+    },
+    "liquidity": {
+      "tvl": 1.7787777380004443e+22,
+      "total_supply": 1817790320015222315763104,
+      "reserves": {
+        "token0_amount": 0.000711,
+        "token1_amount": 4647484736344647.0
+      }
+    },
+    "trading": {
+      "volume_24h": 0.0,
+      "fees_24h": 0.0,
+      "apr": 0,
+      "pool_fee_bps": 30,
+      "pool_fee_percentage": 0.3,
+      "volume_breakdown": {
+        "token0_volume": 0.0,
+        "token1_volume": 0.0
+      },
+      "fees_breakdown": {
+        "token0_fees": 0.0,
+        "token1_fees": 0.0
+      }
+    },
+    "gauge": {
+      "total_supply": 0,
+      "emissions_per_second": 0,
+      "weekly_emissions": 0
+    },
+    "contracts": {
+      "nfpm": "0x0000000000000000000000000000000000000000",
+      "alm": "0x0000000000000000000000000000000000000000"
+    },
+    "voting": null
+  },
+  {
+    "address": "0x272fD48ABd27Fe61FeF2706cD7cD8e24dfF23b31",
+    "symbol": "vAMM-POLICE/\u1e56",
+    "factory": "0x420DD381b31aEf6683db6B902084cB0FFECe40Da",
+    "type_info": {
+      "type": -1,
+      "is_stable": false,
+      "is_cl": false,
+      "label": "volatile",
+      "decimals": 18
+    },
+    "tokens": {
+      "token0": {
+        "address": "0x0Ecb04fD79Ca0549C449F48E233e7aC9a6412F8A",
+        "symbol": "POLICE",
+        "decimals": 18
+      },
+      "token1": {
+        "address": "0xb444314D43f24b07C6650cd68Ef7A305ed32b66b",
+        "symbol": "\u1e56",
+        "decimals": 18
+      }
+    },
+    "liquidity": {
+      "tvl": 1.4021708352599005e+22,
+      "total_supply": 711711000000000000000,
+      "reserves": {
+        "token0_amount": 1.38264327e-10,
+        "token1_amount": 3663508607850805.5
+      }
+    },
+    "trading": {
+      "volume_24h": 1.406390005275455e+22,
+      "fees_24h": 4.219170015826364e+19,
+      "apr": 0,
+      "pool_fee_bps": 30,
+      "pool_fee_percentage": 0.3,
+      "volume_breakdown": {
+        "token0_volume": 0.0,
+        "token1_volume": 3674532204463485.0
+      },
+      "fees_breakdown": {
+        "token0_fees": 0.0,
+        "token1_fees": 11023596613390.453
+      }
+    },
+    "gauge": {
+      "total_supply": 0,
+      "emissions_per_second": 0,
+      "weekly_emissions": 0
+    },
+    "contracts": {
+      "nfpm": "0x0000000000000000000000000000000000000000",
+      "alm": "0x0000000000000000000000000000000000000000"
+    },
+    "voting": null
+  },
+  {
+    "address": "0xea0cC5F01E8EB50154C607D8B1DF2981d0ff6B96",
+    "symbol": "vAMM-\u24c1/cbBTC",
+    "factory": "0x420DD381b31aEf6683db6B902084cB0FFECe40Da",
+    "type_info": {
+      "type": -1,
+      "is_stable": false,
+      "is_cl": false,
+      "label": "volatile",
+      "decimals": 18
+    },
+    "tokens": {
+      "token0": {
+        "address": "0x842e34D551E6ad5560AD45dfE4aa8703F1996Ba8",
+        "symbol": "\u24c1",
+        "decimals": 18
+      },
+      "token1": {
+        "address": "0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf",
+        "symbol": "cbBTC",
+        "decimals": 8
+      }
+    },
+    "liquidity": {
+      "tvl": 1.3494468626985704e+22,
+      "total_supply": 1000000,
+      "reserves": {
+        "token0_amount": 3525754546461616.5,
+        "token1_amount": 1e-08
+      }
+    },
+    "trading": {
+      "volume_24h": 1.3535073848531297e+22,
+      "fees_24h": 4.060522154559389e+19,
+      "apr": 0,
+      "pool_fee_bps": 30,
+      "pool_fee_percentage": 0.3,
+      "volume_breakdown": {
+        "token0_volume": 3536363637373738.0,
+        "token1_volume": 0.0
+      },
+      "fees_breakdown": {
+        "token0_fees": 10609090912121.213,
+        "token1_fees": 0.0
+      }
+    },
+    "gauge": {
+      "total_supply": 0,
+      "emissions_per_second": 0,
+      "weekly_emissions": 0
+    },
+    "contracts": {
+      "nfpm": "0x0000000000000000000000000000000000000000",
+      "alm": "0x0000000000000000000000000000000000000000"
+    },
+    "voting": null
+  },
+  {
+    "address": "0x8DCae909Bbd7d91c650E52035A4F29568192CDd9",
+    "symbol": "vAMM-USBA/PRO",
+    "factory": "0x420DD381b31aEf6683db6B902084cB0FFECe40Da",
+    "type_info": {
+      "type": -1,
+      "is_stable": false,
+      "is_cl": false,
+      "label": "volatile",
+      "decimals": 18
+    },
+    "tokens": {
+      "token0": {
+        "address": "0x52fA342C288060b37776caDF98D8f81C57EBA2B9",
+        "symbol": "USBA",
+        "decimals": 18
+      },
+      "token1": {
+        "address": "0xaE4fcd9434B31Ee7499473C284A153D1EC4dd9a1",
+        "symbol": "PRO",
+        "decimals": 18
+      }
+    },
+    "liquidity": {
+      "tvl": 3.731693522257732e+21,
+      "total_supply": 67840773124080000000000000000000,
+      "reserves": {
+        "token0_amount": 4720397738.4066515,
+        "token1_amount": 9.749963357169144e+17
+      }
+    },
+    "trading": {
+      "volume_24h": 3.750584051294198e+21,
+      "fees_24h": 1.1251752153882593e+19,
+      "apr": 0,
+      "pool_fee_bps": 30,
+      "pool_fee_percentage": 0.3,
+      "volume_breakdown": {
+        "token0_volume": 10000000.000001002,
+        "token1_volume": 9.799319491268762e+17
+      },
+      "fees_breakdown": {
+        "token0_fees": 30000.000000003,
+        "token1_fees": 2939795847380628.0
+      }
+    },
+    "gauge": {
+      "total_supply": 0,
+      "emissions_per_second": 0,
+      "weekly_emissions": 0
+    },
+    "contracts": {
+      "nfpm": "0x0000000000000000000000000000000000000000",
+      "alm": "0x0000000000000000000000000000000000000000"
+    },
+    "voting": null
+  },
+  {
+    "address": "0x3CCB25Df950787aA23DD14859347b97C4e3399d7",
+    "symbol": "vAMM-SHIBADOG/AERO",
+    "factory": "0x420DD381b31aEf6683db6B902084cB0FFECe40Da",
+    "type_info": {
+      "type": -1,
+      "is_stable": false,
+      "is_cl": false,
+      "label": "volatile",
+      "decimals": 18
+    },
+    "tokens": {
+      "token0": {
+        "address": "0xA3824B8BB4C03496227a3788d0Db63f1eeD502E1",
+        "symbol": "SHIBADOG",
+        "decimals": 18
+      },
+      "token1": {
+        "address": "0xbFC806a5c6b842e78E002d25b64e587763ae3aa5",
+        "symbol": "AERO",
+        "decimals": 18
+      }
+    },
+    "liquidity": {
+      "tvl": 3.149606865520767e+21,
+      "total_supply": 4479260450982069224735,
+      "reserves": {
+        "token0_amount": 6.4e-11,
+        "token1_amount": 3.134964716833139e+17
+      }
+    },
+    "trading": {
+      "volume_24h": 0.0,
+      "fees_24h": 0.0,
+      "apr": 0,
+      "pool_fee_bps": 30,
+      "pool_fee_percentage": 0.3,
+      "volume_breakdown": {
+        "token0_volume": 0.0,
+        "token1_volume": 0.0
+      },
+      "fees_breakdown": {
+        "token0_fees": 0.0,
+        "token1_fees": 0.0
+      }
+    },
+    "gauge": {
+      "total_supply": 0,
+      "emissions_per_second": 0,
+      "weekly_emissions": 0
+    },
+    "contracts": {
+      "nfpm": "0x0000000000000000000000000000000000000000",
+      "alm": "0x0000000000000000000000000000000000000000"
+    },
+    "voting": null
+  },
+  {
+    "address": "0x98B03a45E3Abe1f06daF5f54de51e8e1080f6DB7",
+    "symbol": "vAMM-POLICE/E911",
+    "factory": "0x420DD381b31aEf6683db6B902084cB0FFECe40Da",
+    "type_info": {
+      "type": -1,
+      "is_stable": false,
+      "is_cl": false,
+      "label": "volatile",
+      "decimals": 18
+    },
+    "tokens": {
+      "token0": {
+        "address": "0x0Ecb04fD79Ca0549C449F48E233e7aC9a6412F8A",
+        "symbol": "POLICE",
+        "decimals": 18
+      },
+      "token1": {
+        "address": "0xe90F4F126F7F1263b83CcA0779Bf42A15eE5f4FE",
+        "symbol": "E911",
+        "decimals": 18
+      }
+    },
+    "liquidity": {
+      "tvl": 1.530956942320734e+21,
+      "total_supply": 6324555320336758663997787,
+      "reserves": {
+        "token0_amount": 0.0001,
+        "token1_amount": 4e+17
+      }
+    },
+    "trading": {
+      "volume_24h": 0.0,
+      "fees_24h": 0.0,
+      "apr": 0,
+      "pool_fee_bps": 30,
+      "pool_fee_percentage": 0.3,
+      "volume_breakdown": {
+        "token0_volume": 0.0,
+        "token1_volume": 0.0
+      },
+      "fees_breakdown": {
+        "token0_fees": 0.0,
+        "token1_fees": 0.0
+      }
+    },
+    "gauge": {
+      "total_supply": 0,
+      "emissions_per_second": 0,
+      "weekly_emissions": 0
+    },
+    "contracts": {
+      "nfpm": "0x0000000000000000000000000000000000000000",
+      "alm": "0x0000000000000000000000000000000000000000"
+    },
+    "voting": null
+  },
+  {
+    "address": "0x2003E4286bf339c3BdDbD1E251Ad2A96a31e2D9b",
+    "symbol": "vAMM-POLICE/AERO",
+    "factory": "0x420DD381b31aEf6683db6B902084cB0FFECe40Da",
+    "type_info": {
+      "type": -1,
+      "is_stable": false,
+      "is_cl": false,
+      "label": "volatile",
+      "decimals": 18
+    },
+    "tokens": {
+      "token0": {
+        "address": "0x0Ecb04fD79Ca0549C449F48E233e7aC9a6412F8A",
+        "symbol": "POLICE",
+        "decimals": 18
+      },
+      "token1": {
+        "address": "0xbFC806a5c6b842e78E002d25b64e587763ae3aa5",
+        "symbol": "AERO",
+        "decimals": 18
+      }
+    },
+    "liquidity": {
+      "tvl": 1.0036649191467926e+21,
+      "total_supply": 3160694543925432855114,
+      "reserves": {
+        "token0_amount": 1e-10,
+        "token1_amount": 9.98999e+16
+      }
+    },
+    "trading": {
+      "volume_24h": 0.0,
+      "fees_24h": 0.0,
+      "apr": 0,
+      "pool_fee_bps": 30,
+      "pool_fee_percentage": 0.3,
+      "volume_breakdown": {
+        "token0_volume": 0.0,
+        "token1_volume": 0.0
+      },
+      "fees_breakdown": {
+        "token0_fees": 0.0,
+        "token1_fees": 0.0
+      }
+    },
+    "gauge": {
+      "total_supply": 0,
+      "emissions_per_second": 0,
+      "weekly_emissions": 0
+    },
+    "contracts": {
+      "nfpm": "0x0000000000000000000000000000000000000000",
+      "alm": "0x0000000000000000000000000000000000000000"
+    },
+    "voting": null
+  },
+  {
+    "address": "0xEafEd0E3548C74C866e82F62FccF3245321Dcf10",
+    "symbol": "vAMM-AT/AERO",
+    "factory": "0x420DD381b31aEf6683db6B902084cB0FFECe40Da",
+    "type_info": {
+      "type": -1,
+      "is_stable": false,
+      "is_cl": false,
+      "label": "volatile",
+      "decimals": 18
+    },
+    "tokens": {
+      "token0": {
+        "address": "0x38eE6FCABaBd5bdC1f3C583cb9Dce89eF60d45ac",
+        "symbol": "AT",
+        "decimals": 18
+      },
+      "token1": {
+        "address": "0xbFC806a5c6b842e78E002d25b64e587763ae3aa5",
+        "symbol": "AERO",
+        "decimals": 18
+      }
+    },
+    "liquidity": {
+      "tvl": 9.032984272321134e+20,
+      "total_supply": 94820836317762985653,
+      "reserves": {
+        "token0_amount": 1e-13,
+        "token1_amount": 8.990991e+16
+      }
+    },
+    "trading": {
+      "volume_24h": 0.0,
+      "fees_24h": 0.0,
+      "apr": 0,
+      "pool_fee_bps": 30,
+      "pool_fee_percentage": 0.3,
+      "volume_breakdown": {
+        "token0_volume": 0.0,
+        "token1_volume": 0.0
+      },
+      "fees_breakdown": {
+        "token0_fees": 0.0,
+        "token1_fees": 0.0
+      }
+    },
+    "gauge": {
+      "total_supply": 0,
+      "emissions_per_second": 0,
+      "weekly_emissions": 0
+    },
+    "contracts": {
+      "nfpm": "0x0000000000000000000000000000000000000000",
+      "alm": "0x0000000000000000000000000000000000000000"
+    },
+    "voting": null
+  }
+]

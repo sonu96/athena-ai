@@ -226,21 +226,138 @@ if prediction["confidence"] == "high":
     execute_strategy(prediction)
 ```
 
+## Memory Performance Optimization
+
+### Caching Strategy
+The memory system implements multi-level caching for optimal performance:
+
+```python
+# Cache Configuration
+CACHE_CONFIG = {
+    "pattern_cache": {
+        "size": 1000,
+        "ttl": 3600,  # 1 hour
+        "hit_rate_target": 0.7
+    },
+    "query_cache": {
+        "size": 500,
+        "ttl": 300,   # 5 minutes
+        "hit_rate_target": 0.6
+    },
+    "pool_cache": {
+        "size": 200,
+        "ttl": 600,   # 10 minutes
+        "hit_rate_target": 0.8
+    }
+}
+```
+
+### Query Optimization
+```python
+# Optimized memory recall flow
+async def optimized_recall(query, category=None, pool=None):
+    # 1. Check bloom filter (O(1))
+    if not bloom_filter.might_contain(query):
+        return []
+    
+    # 2. Try cache first
+    cache_key = f"{category}:{pool}:{hash(query)}"
+    if cached := cache.get(cache_key):
+        return cached
+    
+    # 3. Query with optimizations
+    results = await memory.recall(
+        query=query,
+        category=category,
+        filters={"pool": pool} if pool else None,
+        use_parallel=True,
+        batch_size=10
+    )
+    
+    # 4. Cache results
+    cache.set(cache_key, results, ttl=300)
+    return results
+```
+
+### Scalability Limits
+To prevent memory explosion, the system enforces strict limits:
+
+| Category | Max Memories | Retention | Pruning Strategy |
+|----------|-------------|-----------|------------------|
+| observation | 1,000 | 7 days | Low confidence removal |
+| pattern | 500 | 30 days | Similarity merging |
+| pool_behavior | 200 | 30 days | Least recently used |
+| cross_pool_correlation | 100 | 14 days | Weak correlation removal |
+| strategy_performance | 300 | 90 days | Aggregation |
+| error_learning | 50 | 7 days | Resolution tracking |
+
+### Memory Pruning Algorithm
+```python
+async def prune_memories():
+    """Hourly memory pruning job"""
+    # 1. Remove low confidence memories
+    await memory.delete_where(
+        confidence__lt=0.3,
+        age__gt=timedelta(hours=48)
+    )
+    
+    # 2. Merge similar patterns
+    patterns = await memory.get_patterns()
+    for p1, p2 in find_similar_pairs(patterns, threshold=0.9):
+        await memory.merge_patterns(p1, p2)
+    
+    # 3. Enforce category quotas
+    for category, limit in CATEGORY_LIMITS.items():
+        excess = await memory.count(category=category) - limit
+        if excess > 0:
+            await memory.delete_oldest(category, count=excess)
+    
+    # 4. Compress metadata
+    await memory.compress_metadata(age__gt=timedelta(days=1))
+```
+
 ## Monitoring
 
-Track memory system performance:
-```python
-# Get pool profile summary
-summary = pool_profiles.get_summary()
-print(f"Total profiles: {summary['total_profiles']}")
-print(f"High confidence pools: {summary['high_confidence_pools']}")
-print(f"Pools with patterns: {summary['pools_with_patterns']}")
+### Performance Metrics
+Track memory system health with these key metrics:
 
-# Check memory distribution
-memories_per_pool = {}
-for pool in tracked_pools:
-    count = len(await memory.recall_pool_memories(pool))
-    memories_per_pool[pool] = count
+```python
+# Memory system metrics
+metrics = {
+    "memory_count": await memory.count(),
+    "cache_hit_rate": cache.get_hit_rate(),
+    "query_latency_p95": query_monitor.get_percentile(95),
+    "pruning_effectiveness": pruner.get_effectiveness(),
+    "storage_usage_mb": memory.get_storage_usage() / 1024 / 1024
+}
+
+# Pool profile metrics
+profile_metrics = {
+    "total_profiles": pool_profiles.count(),
+    "high_confidence_pools": pool_profiles.count_high_confidence(0.8),
+    "avg_observations_per_pool": pool_profiles.get_avg_observations(),
+    "prediction_accuracy": pool_profiles.get_prediction_accuracy()
+}
+```
+
+### Alert Thresholds
+```yaml
+alerts:
+  - name: MemoryGrowthHigh
+    condition: memory_growth_rate > 200/hour
+    severity: warning
+    
+  - name: CacheHitRateLow
+    condition: cache_hit_rate < 0.5
+    severity: warning
+    
+  - name: QueryLatencyHigh
+    condition: query_latency_p95 > 200ms
+    severity: critical
+    
+  - name: MemoryQuotaExceeded
+    condition: category_count > category_limit
+    severity: error
 ```
 
 ## Future Enhancements

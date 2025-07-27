@@ -303,6 +303,213 @@ ws.onmessage = (event) => {
 };
 ```
 
+## Risk Management Endpoints
+
+### GET /risk/status
+Get current risk metrics and circuit breaker status.
+
+**Response:**
+```json
+{
+  "portfolio_risk_score": 35,
+  "risk_level": "MEDIUM",
+  "circuit_breakers": {
+    "rapid_loss": {
+      "status": "active",
+      "triggered_at": null,
+      "cooldown_until": null
+    },
+    "portfolio_drawdown": {
+      "status": "active",
+      "triggered_at": null
+    },
+    "gas_manipulation": {
+      "status": "tripped",
+      "triggered_at": "2024-01-15T10:30:00Z",
+      "cooldown_until": "2024-01-15T11:00:00Z"
+    }
+  },
+  "exposure_summary": {
+    "max_position_concentration": 0.18,
+    "token_exposures": {
+      "WETH": 0.35,
+      "USDC": 0.40,
+      "AERO": 0.25
+    }
+  }
+}
+```
+
+### POST /risk/override
+Override risk limits (requires admin authentication).
+
+**Request Body:**
+```json
+{
+  "parameter": "max_position_size",
+  "value": 2000,
+  "duration_minutes": 60,
+  "reason": "High confidence opportunity"
+}
+```
+
+### GET /risk/exposure
+Get detailed portfolio exposure analysis.
+
+## Performance Endpoints
+
+### GET /performance/cache-stats
+Get cache hit rates and performance metrics.
+
+**Response:**
+```json
+{
+  "caches": {
+    "pattern_cache": {
+      "size": 847,
+      "max_size": 1000,
+      "hit_rate": 0.73,
+      "ttl": 3600
+    },
+    "query_cache": {
+      "size": 423,
+      "max_size": 500,
+      "hit_rate": 0.65,
+      "ttl": 300
+    },
+    "llm_cache": {
+      "size": 512,
+      "max_size": 1000,
+      "hit_rate": 0.81,
+      "ttl": 86400
+    }
+  },
+  "total_hit_rate": 0.73
+}
+```
+
+### GET /performance/query-stats
+Get query performance statistics.
+
+**Response:**
+```json
+{
+  "memory_queries": {
+    "count_24h": 15420,
+    "avg_latency_ms": 85,
+    "p95_latency_ms": 142,
+    "p99_latency_ms": 203
+  },
+  "firestore_operations": {
+    "reads_per_minute": 45,
+    "writes_per_minute": 12,
+    "batch_efficiency": 0.82
+  }
+}
+```
+
+## Recovery Endpoints
+
+### POST /recovery/checkpoint
+Manually trigger state checkpoint.
+
+**Response:**
+```json
+{
+  "checkpoint_id": "ckpt_20240115_103500",
+  "timestamp": "2024-01-15T10:35:00Z",
+  "storage_locations": ["firestore", "gcs", "local"],
+  "size_mb": 2.4,
+  "checksum": "sha256:abcd1234..."
+}
+```
+
+### POST /recovery/restore
+Restore from specific checkpoint.
+
+**Request Body:**
+```json
+{
+  "checkpoint_id": "ckpt_20240115_093000",
+  "verify": true
+}
+```
+
+### GET /recovery/status
+Get recovery system status.
+
+**Response:**
+```json
+{
+  "recovery_mode": false,
+  "last_checkpoint": {
+    "id": "ckpt_20240115_103000",
+    "age_minutes": 5,
+    "verified": true
+  },
+  "available_checkpoints": 168,
+  "backup_health": {
+    "firestore": "healthy",
+    "gcs": "healthy",
+    "local": "healthy"
+  }
+}
+```
+
+## Monitoring Endpoints
+
+### GET /metrics
+Prometheus-compatible metrics endpoint.
+
+**Response (Prometheus format):**
+```
+# HELP memory_growth_rate Number of new memories per hour
+# TYPE memory_growth_rate gauge
+memory_growth_rate 85.0
+
+# HELP cache_hit_rate Cache hit rate ratio
+# TYPE cache_hit_rate gauge
+cache_hit_rate{cache="pattern"} 0.73
+cache_hit_rate{cache="query"} 0.65
+
+# HELP circuit_breaker_triggers Total circuit breaker activations
+# TYPE circuit_breaker_triggers counter
+circuit_breaker_triggers{type="rapid_loss"} 2
+circuit_breaker_triggers{type="gas_manipulation"} 5
+```
+
+### GET /health/detailed
+Comprehensive health check of all subsystems.
+
+**Response:**
+```json
+{
+  "status": "healthy",
+  "subsystems": {
+    "memory": {
+      "status": "healthy",
+      "memory_count": 4523,
+      "query_latency_ms": 82
+    },
+    "firestore": {
+      "status": "healthy",
+      "write_queue_depth": 3,
+      "last_error": null
+    },
+    "mcp": {
+      "status": "healthy",
+      "last_query_ms": 145
+    },
+    "agentkit": {
+      "status": "healthy",
+      "wallet_accessible": true
+    }
+  },
+  "uptime_seconds": 432000,
+  "last_cycle": "2024-01-15T10:35:00Z"
+}
+```
+
 ## Running the API
 
 The API can be run standalone or alongside the main agent:

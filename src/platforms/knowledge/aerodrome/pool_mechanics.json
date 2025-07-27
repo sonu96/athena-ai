@@ -1,0 +1,230 @@
+{
+  "pool_types": {
+    "stable": {
+      "name": "Stable Pool (sAMM)",
+      "formula": "x³y + y³x = k",
+      "fee": 0.0001,
+      "use_cases": [
+        "Stablecoin pairs (USDC/USDT)",
+        "Pegged assets (ETH/stETH)",
+        "Wrapped tokens (WBTC/BTC)"
+      ],
+      "advantages": [
+        "Minimal slippage for large trades",
+        "Efficient for correlated assets",
+        "Lower impermanent loss"
+      ],
+      "optimal_conditions": {
+        "price_correlation": ">0.95",
+        "volatility": "<5% daily",
+        "tvl_recommendation": ">$1M for efficiency"
+      }
+    },
+    "volatile": {
+      "name": "Volatile Pool (vAMM)",
+      "formula": "x × y = k",
+      "fee": 0.003,
+      "use_cases": [
+        "Uncorrelated pairs (ETH/USDC)",
+        "Volatile assets (AERO/ETH)",
+        "New token launches"
+      ],
+      "advantages": [
+        "Simple and proven model",
+        "Works for any price ratio",
+        "Permissionless creation"
+      ],
+      "risks": {
+        "impermanent_loss": "Can be significant",
+        "slippage": "Increases with trade size",
+        "require_balance": "50/50 value ratio"
+      }
+    }
+  },
+  
+  "pool_lifecycle": {
+    "creation": {
+      "requirements": [
+        "Choose pool type (stable/volatile)",
+        "Provide initial liquidity",
+        "Set fee tier (fixed by type)",
+        "No permission needed"
+      ],
+      "initial_phase": {
+        "duration": "0-7 days",
+        "characteristics": [
+          "High APR to attract liquidity",
+          "Price discovery period",
+          "Volatile metrics"
+        ]
+      }
+    },
+    
+    "growth": {
+      "duration": "1-4 weeks",
+      "indicators": [
+        "TVL increasing steadily",
+        "Volume/TVL ratio stabilizing",
+        "APR normalizing to market"
+      ],
+      "strategies": [
+        "Compound frequently",
+        "Monitor for rebalancing",
+        "Watch vote allocation"
+      ]
+    },
+    
+    "maturity": {
+      "duration": "Ongoing",
+      "characteristics": [
+        "Stable TVL",
+        "Predictable APR",
+        "Regular volume"
+      ],
+      "optimization": [
+        "Less frequent compounding",
+        "Focus on fee generation",
+        "Consider veAERO boost"
+      ]
+    },
+    
+    "decline": {
+      "warning_signs": [
+        "Votes migrating away",
+        "TVL decreasing",
+        "Volume drying up"
+      ],
+      "actions": [
+        "Prepare exit strategy",
+        "Don't add more liquidity",
+        "Claim all rewards"
+      ]
+    }
+  },
+  
+  "liquidity_provision": {
+    "adding_liquidity": {
+      "process": [
+        "Approve both tokens",
+        "Choose amounts (maintain ratio)",
+        "Add liquidity transaction",
+        "Receive LP tokens"
+      ],
+      "considerations": {
+        "gas_optimization": "Add during low-gas periods",
+        "size_efficiency": "Minimum $500 for gas efficiency",
+        "price_impact": "Check slippage before adding"
+      }
+    },
+    
+    "lp_token_mechanics": {
+      "representation": "Share of pool ownership",
+      "value_accrual": "Increases with fees collected",
+      "transferable": true,
+      "stakeable": "In gauges for rewards"
+    },
+    
+    "removing_liquidity": {
+      "process": [
+        "Unstake from gauge if staked",
+        "Approve LP tokens",
+        "Remove liquidity",
+        "Receive both tokens back"
+      ],
+      "timing": {
+        "optimal": "When pools are balanced",
+        "avoid": "During high volatility",
+        "gas_consideration": "Batch with reward claims"
+      }
+    }
+  },
+  
+  "fee_mechanics": {
+    "collection": {
+      "automatic": true,
+      "compounds": "Into pool reserves",
+      "distribution": "100% to LPs"
+    },
+    
+    "calculation": {
+      "stable_pools": "amount × 0.01%",
+      "volatile_pools": "amount × 0.3%",
+      "paid_by": "Trader on each swap"
+    },
+    
+    "optimization": {
+      "high_volume_pairs": "Maximize fee generation",
+      "stable_preference": "For large positions",
+      "volatile_opportunity": "Higher fees compensate IL"
+    }
+  },
+  
+  "gauge_integration": {
+    "staking_lp": {
+      "benefits": [
+        "Earn AERO emissions",
+        "Maintain liquidity provision",
+        "Eligible for boost"
+      ],
+      "process": [
+        "Approve LP tokens",
+        "Stake in pool's gauge",
+        "Start earning immediately"
+      ]
+    },
+    
+    "reward_mechanics": {
+      "distribution": "Pro-rata by staked share",
+      "claiming": "Manual claim required",
+      "frequency": "Accumulates per second",
+      "boost_applied": "At time of claiming"
+    },
+    
+    "optimization_tips": [
+      "Stake immediately after adding liquidity",
+      "Claim and compound weekly minimum",
+      "Consider veAERO for boost"
+    ]
+  },
+  
+  "advanced_strategies": {
+    "concentrated_liquidity_prep": {
+      "coming_features": [
+        "Set custom price ranges",
+        "Higher capital efficiency",
+        "Active management required"
+      ],
+      "preparation": [
+        "Learn from Uniswap V3",
+        "Practice range setting",
+        "Prepare rebalancing tools"
+      ]
+    },
+    
+    "multi_pool_strategies": {
+      "diversification": [
+        "Spread across 3-5 pools",
+        "Mix stable and volatile",
+        "Different correlation levels"
+      ],
+      "correlation_plays": [
+        "ETH/stETH for low risk",
+        "USDC/AERO for emissions",
+        "New pairs for high APR"
+      ]
+    },
+    
+    "flash_loan_integration": {
+      "use_cases": [
+        "Arbitrage between pools",
+        "Liquidation protection",
+        "Capital-free rebalancing"
+      ],
+      "requirements": [
+        "Technical knowledge",
+        "Smart contract capability",
+        "Gas optimization crucial"
+      ]
+    }
+  }
+}

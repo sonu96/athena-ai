@@ -1,0 +1,217 @@
+{
+  "gauge_overview": {
+    "purpose": "Measure and reward liquidity provision with AERO emissions",
+    "key_functions": [
+      "Stake LP tokens to earn rewards",
+      "Receive AERO emissions based on votes",
+      "Distribute rewards pro-rata to stakers",
+      "Enable boosted rewards for veAERO holders"
+    ],
+    "gauge_types": {
+      "standard": "For regular liquidity pools",
+      "partnered": "Special gauges with additional rewards",
+      "capped": "Gauges with maximum emission limits"
+    }
+  },
+  
+  "voting_mechanics": {
+    "epoch_schedule": {
+      "duration": 604800,
+      "duration_readable": "1 week",
+      "start_time": "Thursday 00:00 UTC",
+      "end_time": "Wednesday 23:59 UTC",
+      "vote_deadline": "Before epoch ends",
+      "emission_start": "Beginning of next epoch"
+    },
+    
+    "voting_rules": {
+      "allocation": "Must allocate 100% of voting power",
+      "minimum_votes": "No minimum per pool",
+      "maximum_pools": "No maximum limit",
+      "vote_decay": "Votes don't carry to next epoch",
+      "revoting": "Can change votes until deadline"
+    },
+    
+    "vote_calculation": {
+      "formula": "pool_emissions = total_emissions × (pool_votes / total_votes)",
+      "factors": [
+        "Total veAERO voting",
+        "Individual pool votes",
+        "Weekly emission amount"
+      ]
+    }
+  },
+  
+  "reward_distribution": {
+    "emission_flow": {
+      "step1": "Weekly AERO minted",
+      "step2": "67% allocated to gauges",
+      "step3": "Distributed by vote weight",
+      "step4": "Gauges stream to stakers",
+      "step5": "Stakers claim rewards"
+    },
+    
+    "staker_rewards": {
+      "base_calculation": "stake_share × gauge_emissions",
+      "boost_applied": "At claim time",
+      "accumulation": "Per second streaming",
+      "claiming": {
+        "frequency": "Any time",
+        "gas_optimization": "Weekly recommended",
+        "auto_compound": "Not native - manual required"
+      }
+    },
+    
+    "boost_mechanics": {
+      "formula": "min(1 + 1.5 × (veAERO_share / LP_share), 2.5)",
+      "requirements": {
+        "veAERO_needed": "Proportional to LP position",
+        "calculation_example": {
+          "lp_position": "$10,000",
+          "pool_tvl": "$1,000,000",
+          "lp_share": "1%",
+          "veaero_for_max_boost": "1% of total veAERO"
+        }
+      },
+      "optimization": [
+        "Lock AERO before adding liquidity",
+        "Calculate required veAERO for target boost",
+        "Monitor boost degradation as TVL grows"
+      ]
+    }
+  },
+  
+  "bribe_ecosystem": {
+    "bribe_markets": {
+      "purpose": "Incentivize votes to specific pools",
+      "participants": [
+        "Protocols needing liquidity",
+        "veAERO voters seeking yield",
+        "Market makers and aggregators"
+      ]
+    },
+    
+    "bribe_mechanics": {
+      "posting_bribes": {
+        "timing": "Before voting deadline",
+        "tokens": "Any ERC-20 accepted",
+        "distribution": "Pro-rata to voters",
+        "claiming": "After epoch ends"
+      },
+      
+      "voter_strategy": {
+        "research": [
+          "Check $/veAERO ratios",
+          "Verify bribe consistency",
+          "Calculate total returns"
+        ],
+        "optimization": [
+          "Vote 2-4 hours before deadline",
+          "Split votes for diversification",
+          "Track historical bribe data"
+        ]
+      }
+    },
+    
+    "bribe_calculation": {
+      "example": {
+        "pool_bribes": "$10,000",
+        "pool_votes": "1,000,000 veAERO",
+        "your_votes": "10,000 veAERO",
+        "your_share": "1%",
+        "your_bribes": "$100"
+      },
+      "apr_impact": {
+        "weekly_bribes": "$100",
+        "annual_bribes": "$5,200",
+        "veaero_value": "$20,000",
+        "bribe_apr": "26%"
+      }
+    }
+  },
+  
+  "advanced_gauge_strategies": {
+    "gauge_gaming": {
+      "vote_sniping": {
+        "description": "Vote for undervalued gauges last minute",
+        "execution": [
+          "Monitor vote distribution",
+          "Identify high APR/low vote pools",
+          "Vote in final hours",
+          "Provide liquidity immediately"
+        ]
+      },
+      
+      "gauge_rotation": {
+        "description": "Follow votes week to week",
+        "method": [
+          "Track voting patterns",
+          "Predict next week's winners",
+          "Pre-position liquidity",
+          "Ride emission waves"
+        ]
+      }
+    },
+    
+    "multi_gauge_optimization": {
+      "strategy": "Spread LP across multiple gauges",
+      "benefits": [
+        "Diversified emission exposure",
+        "Reduced single-pool risk",
+        "Capture vote migrations"
+      ],
+      "execution": [
+        "Select 3-5 complementary pools",
+        "Balance based on vote stability",
+        "Rebalance monthly"
+      ]
+    },
+    
+    "gauge_arbitrage": {
+      "cross_pool": {
+        "description": "Exploit emission differences",
+        "example": "WETH/USDC vs ETH/USDC gauges",
+        "execution": "Move to higher emission gauge"
+      },
+      
+      "time_arbitrage": {
+        "description": "Front-run vote changes",
+        "method": "Add liquidity before votes shift",
+        "risk": "Votes may not materialize"
+      }
+    }
+  },
+  
+  "gauge_metrics": {
+    "key_indicators": {
+      "votes_per_dollar_tvl": {
+        "description": "Gauge efficiency metric",
+        "calculation": "total_votes / pool_tvl",
+        "interpretation": "Higher = more emissions per dollar"
+      },
+      
+      "emission_sustainability": {
+        "description": "Long-term gauge health",
+        "factors": [
+          "Vote consistency over time",
+          "Bribe reliability",
+          "Protocol backing"
+        ]
+      },
+      
+      "boost_efficiency": {
+        "description": "Average boost utilization",
+        "healthy_range": [1.5, 2.0],
+        "interpretation": "Low = opportunity for veAERO holders"
+      }
+    },
+    
+    "monitoring_tools": [
+      "Gauge vote tracker",
+      "Historical emission data",
+      "Boost calculator",
+      "Bribe aggregator",
+      "APR predictor"
+    ]
+  }
+}
